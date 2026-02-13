@@ -78,9 +78,24 @@ def update_queue_status():
             update_card(card_id, f"⏳ 排队中... 前方还有 {pos - 1} 人，共 {total} 人等待")
 
 
-# 启动工作线程
-worker = threading.Thread(target=queue_worker, daemon=True)
-worker.start()
+# 初始化标记，确保只启动一次工作线程
+_initialized = False
+_init_lock = threading.Lock()
+
+
+def init_app():
+    """初始化应用：启动工作线程 + 获取 BOT_OPEN_ID"""
+    global _initialized
+    with _init_lock:
+        if _initialized:
+            return
+        _initialized = True
+        # 启动工作线程
+        worker = threading.Thread(target=queue_worker, daemon=True)
+        worker.start()
+        print("[初始化] 工作线程已启动")
+        # 获取机器人 open_id
+        get_bot_open_id()
 
 
 # 飞书 tenant_access_token 缓存
@@ -344,11 +359,9 @@ def handle_webhook():
 
 
 @app.before_request
-def ensure_bot_id():
-    """确保 BOT_OPEN_ID 已初始化"""
-    global BOT_OPEN_ID
-    if BOT_OPEN_ID is None:
-        get_bot_open_id()
+def ensure_init():
+    """确保应用已初始化（工作线程 + BOT_OPEN_ID）"""
+    init_app()
 
 
 @app.route('/', methods=['POST'])
@@ -373,6 +386,6 @@ def health():
 if __name__ == '__main__':
     print(f"飞书 Bot 启动中...")
     print(f"监听端口: {config.PORT}")
-    get_bot_open_id()
+    init_app()
     print(f"请确保 ngrok 已启动: ngrok http {config.PORT}")
     app.run(host='0.0.0.0', port=config.PORT, debug=False)
