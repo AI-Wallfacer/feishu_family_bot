@@ -343,6 +343,14 @@ def handle_webhook():
         return jsonify({"error": str(e)}), 500
 
 
+@app.before_request
+def ensure_bot_id():
+    """确保 BOT_OPEN_ID 已初始化"""
+    global BOT_OPEN_ID
+    if BOT_OPEN_ID is None:
+        get_bot_open_id()
+
+
 @app.route('/', methods=['POST'])
 def root_webhook():
     """根路径也处理 Webhook（兼容不同 URL 配置）"""
