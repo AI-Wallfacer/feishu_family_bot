@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: feishu-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn bot:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: FEISHU_APP_ID
+        sync: false
+      - key: FEISHU_APP_SECRET
+        sync: false
+      - key: FEISHU_VERIFICATION_TOKEN
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_API_BASE
+        sync: false
+      - key: AI_MODEL
+        sync: false
