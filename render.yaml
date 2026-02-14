@@ -17,9 +17,17 @@ services:
         sync: false
       - key: AI_KEY_CLAUDE
         sync: false
+      - key: AI_BASE_CLAUDE
+        sync: false
       - key: AI_KEY_CODEX
+        sync: false
+      - key: AI_BASE_CODEX
         sync: false
       - key: AI_KEY_CN
         sync: false
+      - key: AI_BASE_CN
+        sync: false
       - key: AI_KEY_GEMINI
+        sync: false
+      - key: AI_BASE_GEMINI
         sync: false

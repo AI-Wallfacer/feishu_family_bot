@@ -7,29 +7,33 @@ FEISHU_VERIFICATION_TOKEN = os.environ.get("FEISHU_VERIFICATION_TOKEN", "")
 FEISHU_ENCRYPT_KEY = os.environ.get("FEISHU_ENCRYPT_KEY", "")
 
 # AI API 配置
-AI_API_BASE = os.environ.get("AI_API_BASE", "")
+AI_API_BASE = os.environ.get("AI_API_BASE", "")  # 全局默认，分组未配置时使用
 AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "4096"))
 
-# 多分组模型配置：每组有自己的 Key 和模型列表，按优先级排列
+# 多分组模型配置：每组有自己的 Key、API 地址和模型列表，按优先级排列
 AI_GROUPS = [
     {
         "name": "Claude",
         "key": os.environ.get("AI_KEY_CLAUDE", ""),
+        "base": os.environ.get("AI_BASE_CLAUDE", ""),
         "models": os.environ.get("AI_MODELS_CLAUDE", "claude-opus-4-6,claude-sonnet-4-5-20250929,claude-haiku-4-5")
     },
     {
         "name": "codex",
         "key": os.environ.get("AI_KEY_CODEX", ""),
+        "base": os.environ.get("AI_BASE_CODEX", ""),
         "models": os.environ.get("AI_MODELS_CODEX", "gpt-5.2")
     },
     {
         "name": "国内模型",
         "key": os.environ.get("AI_KEY_CN", ""),
+        "base": os.environ.get("AI_BASE_CN", ""),
         "models": os.environ.get("AI_MODELS_CN", "glm-4.7,kimi-k2.5")
     },
     {
         "name": "Gemini",
         "key": os.environ.get("AI_KEY_GEMINI", ""),
+        "base": os.environ.get("AI_BASE_GEMINI", ""),
         "models": os.environ.get("AI_MODELS_GEMINI", "gemini-3-pro-preview,gemini-3-flash-preview")
     },
 ]

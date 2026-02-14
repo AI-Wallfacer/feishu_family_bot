@@ -37,11 +37,15 @@
 | `FEISHU_APP_ID` | 飞书应用 App ID | ✅ |
 | `FEISHU_APP_SECRET` | 飞书应用 App Secret | ✅ |
 | `FEISHU_VERIFICATION_TOKEN` | 飞书事件订阅验证 Token | ✅ |
-| `AI_API_BASE` | AI API 地址（兼容 OpenAI 格式） | ✅ |
+| `AI_API_BASE` | 全局默认 AI API 地址（分组未单独配置时使用） | ❌ |
 | `AI_KEY_CLAUDE` | Claude 分组 API Key | 至少填一组 |
+| `AI_BASE_CLAUDE` | Claude 分组 API 地址（不填则用全局） | ❌ |
 | `AI_KEY_CODEX` | GPT 分组 API Key | 至少填一组 |
+| `AI_BASE_CODEX` | GPT 分组 API 地址（不填则用全局） | ❌ |
 | `AI_KEY_CN` | 国内模型分组 API Key | 至少填一组 |
+| `AI_BASE_CN` | 国内模型分组 API 地址（不填则用全局） | ❌ |
 | `AI_KEY_GEMINI` | Gemini 分组 API Key | 至少填一组 |
+| `AI_BASE_GEMINI` | Gemini 分组 API 地址（不填则用全局） | ❌ |
 | `AI_MAX_TOKENS` | 最大输出 token 数（默认 4096） | ❌ |
 | `SYSTEM_PROMPT` | 自定义机器人人设提示词 | ❌ |
 

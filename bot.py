@@ -76,12 +76,16 @@ def call_ai(messages):
         if not api_key:
             continue  # 跳过未配置 Key 的分组
 
+        api_base = group.get("base") or config.AI_API_BASE
+        if not api_base:
+            continue  # 跳过未配置 API 地址的分组
+
         group_name = group["name"]
         models = [m.strip() for m in group["models"].split(",") if m.strip()]
 
         for model in models:
             try:
-                url = f"{config.AI_API_BASE}/v1/chat/completions"
+                url = f"{api_base}/v1/chat/completions"
                 headers = {
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
