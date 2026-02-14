@@ -1,8 +1,9 @@
 import json
 import time
+import traceback
 import threading
 import requests
-from collections import defaultdict, deque
+from collections import deque
 from cachetools import TTLCache
 from flask import Flask, request, jsonify
 import config
@@ -11,9 +12,11 @@ app = Flask(__name__)
 
 # 消息去重（TTL 缓存，5 分钟过期，最多 2000 条）
 processed_messages = TTLCache(maxsize=2000, ttl=300)
+_dedup_lock = threading.Lock()
 
-# 多轮对话上下文 {sender_chat_key: deque([(role, content), ...])}
-chat_history = defaultdict(lambda: deque(maxlen=10))
+# 多轮对话上下文（30 分钟过期，最多 500 个会话）
+chat_history = TTLCache(maxsize=500, ttl=1800)
+_history_lock = threading.Lock()
 
 # 飞书消息最大长度
 MAX_MSG_LEN = 4000
@@ -70,8 +73,11 @@ def call_ai(messages):
     """调用 AI API，支持多分组多 Key 自动切换，统一 OpenAI 格式"""
     for group in config.AI_GROUPS:
         api_key = group["key"]
+        if not api_key:
+            continue  # 跳过未配置 Key 的分组
+
         group_name = group["name"]
-        models = [m.strip() for m in group["models"].split(",")]
+        models = [m.strip() for m in group["models"].split(",") if m.strip()]
 
         for model in models:
             try:
@@ -94,7 +100,12 @@ def call_ai(messages):
                     print(f"[{group_name}/{model} 失败] 尝试下一个...")
                     continue
 
-                return result["choices"][0]["message"]["content"]
+                choices = result.get("choices")
+                if not choices:
+                    print(f"[{group_name}/{model} 失败] 响应无 choices，尝试下一个...")
+                    continue
+
+                return choices[0]["message"]["content"]
 
             except Exception as e:
                 print(f"[{group_name}/{model} 调用失败] {e}")
@@ -177,11 +188,12 @@ def process_message(event_data):
         text = content.get("text", "").strip()
         mentions = message.get("mentions", [])
 
-        # 消息去重
-        if message_id in processed_messages:
-            print(f"[去重] {message_id}")
-            return
-        processed_messages[message_id] = True
+        # 消息去重（加锁保证线程安全）
+        with _dedup_lock:
+            if message_id in processed_messages:
+                print(f"[去重] {message_id}")
+                return
+            processed_messages[message_id] = True
 
         # 群聊中只回复 @机器人 的消息，私聊全部回复
         if chat_type == "group":
@@ -193,7 +205,7 @@ def process_message(event_data):
                         bot_mentioned = True
                         break
             if not bot_mentioned:
-                print(f"[跳过] 群聊消息未@机器人, BOT_OPEN_ID={BOT_OPEN_ID}")
+                print(f"[跳过] 群聊消息未@机器人")
                 return
             for m in mentions:
                 text = text.replace(m.get("key", ""), "").strip()
@@ -206,18 +218,23 @@ def process_message(event_data):
         # 先回复"思考中..."
         thinking_id = reply_card(message_id, "🤔 思考中...")
 
-        # 构建多轮对话上下文
+        # 构建多轮对话上下文（加锁保证线程安全）
         context_key = f"{sender_id}_{chat_id}"
-        history = chat_history[context_key]
-        history.append({"role": "user", "content": text})
-        messages = list(history)
+        with _history_lock:
+            if context_key not in chat_history:
+                chat_history[context_key] = deque(maxlen=10)
+            history = chat_history[context_key]
+            history.append({"role": "user", "content": text})
+            messages = list(history)
 
         # 调用 AI
         reply_text = call_ai(messages)
         reply_text = truncate(reply_text)
 
         # 保存回复到上下文
-        history.append({"role": "assistant", "content": reply_text})
+        with _history_lock:
+            if context_key in chat_history:
+                chat_history[context_key].append({"role": "assistant", "content": reply_text})
 
         # 更新卡片为实际回复
         if thinking_id:
@@ -229,14 +246,18 @@ def process_message(event_data):
 
     except Exception as e:
         print(f"处理消息失败: {e}")
-        import traceback
         traceback.print_exc()
 
 
 def handle_webhook():
     """处理飞书 Webhook"""
     try:
+        if not request.is_json:
+            return jsonify({"error": "invalid request body"}), 400
         data = request.json
+        if not data:
+            return jsonify({"error": "empty request body"}), 400
+
         print(f"[收到请求] {json.dumps(data, ensure_ascii=False)[:200]}")
 
         # URL 验证
@@ -256,7 +277,6 @@ def handle_webhook():
         print(f"[事件] 类型: {event_type}")
 
         if event_type == "im.message.receive_v1":
-            # 直接开线程处理，不用队列
             t = threading.Thread(target=process_message, args=(event,), daemon=True)
             t.start()
 
@@ -267,7 +287,7 @@ def handle_webhook():
         return jsonify({"error": str(e)}), 500
 
 
-# 初始化 BOT_OPEN_ID
+# 初始化 BOT_OPEN_ID（注意：仅适用于单 worker 模式）
 _init_done = False
 _init_lock = threading.Lock()
 

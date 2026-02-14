@@ -13,9 +13,13 @@ services:
         sync: false
       - key: FEISHU_VERIFICATION_TOKEN
         sync: false
-      - key: AI_API_KEY
-        sync: false
       - key: AI_API_BASE
         sync: false
-      - key: AI_MODEL
+      - key: AI_KEY_CLAUDE
+        sync: false
+      - key: AI_KEY_CODEX
+        sync: false
+      - key: AI_KEY_CN
+        sync: false
+      - key: AI_KEY_GEMINI
         sync: false
