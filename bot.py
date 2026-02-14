@@ -67,52 +67,38 @@ def get_bot_open_id():
 
 
 def call_ai(messages):
-    """调用 AI API 生成回复，支持多模型自动切换"""
-    models = [m.strip() for m in config.AI_MODEL.split(",")]
-    ANTHROPIC_PREFIXES = ("claude",)
+    """调用 AI API，支持多分组多 Key 自动切换，统一 OpenAI 格式"""
+    for group in config.AI_GROUPS:
+        api_key = group["key"]
+        group_name = group["name"]
+        models = [m.strip() for m in group["models"].split(",")]
 
-    for model in models:
-        try:
-            headers = {
-                "Authorization": f"Bearer {config.AI_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            is_anthropic = model.lower().startswith(ANTHROPIC_PREFIXES)
-
-            if is_anthropic:
-                url = f"{config.AI_API_BASE}/v1/messages"
-                headers["x-api-key"] = config.AI_API_KEY
-                headers["anthropic-version"] = "2023-06-01"
-                payload = {
-                    "model": model,
-                    "max_tokens": config.AI_MAX_TOKENS,
-                    "system": config.SYSTEM_PROMPT,
-                    "messages": messages
-                }
-            else:
+        for model in models:
+            try:
                 url = f"{config.AI_API_BASE}/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
                 payload = {
                     "model": model,
                     "max_tokens": config.AI_MAX_TOKENS,
                     "messages": [{"role": "system", "content": config.SYSTEM_PROMPT}] + messages
                 }
 
-            resp = requests.post(url, headers=headers, json=payload, timeout=120)
-            result = resp.json()
-            print(f"[AI响应 {model}] {json.dumps(result, ensure_ascii=False)[:200]}")
+                resp = requests.post(url, headers=headers, json=payload, timeout=120)
+                result = resp.json()
+                print(f"[AI响应 {group_name}/{model}] {json.dumps(result, ensure_ascii=False)[:200]}")
 
-            if "error" in result:
-                print(f"[模型 {model} 失败] 尝试下一个...")
-                continue
+                if "error" in result:
+                    print(f"[{group_name}/{model} 失败] 尝试下一个...")
+                    continue
 
-            if is_anthropic:
-                return result["content"][0]["text"]
-            else:
                 return result["choices"][0]["message"]["content"]
 
-        except Exception as e:
-            print(f"[模型 {model} 调用失败] {e}")
-            continue
+            except Exception as e:
+                print(f"[{group_name}/{model} 调用失败] {e}")
+                continue
 
     return "抱歉，所有模型都无法回复，请稍后再试。"
 
