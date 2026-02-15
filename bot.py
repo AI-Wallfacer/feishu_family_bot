@@ -1,5 +1,6 @@
 import json
 import time
+import base64
 import traceback
 import threading
 import requests
@@ -17,6 +18,10 @@ _dedup_lock = threading.Lock()
 # 多轮对话上下文（30 分钟过期，最多 500 个会话）
 chat_history = TTLCache(maxsize=500, ttl=1800)
 _history_lock = threading.Lock()
+
+# 用户模型选择（30 分钟过期，最多 500 个用户）
+user_model_choice = TTLCache(maxsize=500, ttl=1800)
+_model_choice_lock = threading.Lock()
 
 # 飞书消息最大长度
 MAX_MSG_LEN = 4000
@@ -41,14 +46,21 @@ def get_tenant_access_token():
             "app_id": config.FEISHU_APP_ID,
             "app_secret": config.FEISHU_APP_SECRET
         }
-        response = requests.post(url, json=payload, timeout=10)
-        data = response.json()
-        token = data.get("tenant_access_token")
-        expire = data.get("expire", 7200)
-        _token_cache["token"] = token
-        _token_cache["expire_at"] = now + expire
-        print(f"[Token] 已刷新，有效期 {expire}s")
-        return token
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            data = response.json()
+            token = data.get("tenant_access_token")
+            if not token:
+                print(f"[Token] 获取失败: {data}")
+                return _token_cache["token"]  # 返回旧 token（可能为 None）
+            expire = data.get("expire", 7200)
+            _token_cache["token"] = token
+            _token_cache["expire_at"] = now + expire
+            print(f"[Token] 已刷新，有效期 {expire}s")
+            return token
+        except Exception as e:
+            print(f"[Token] 请求异常: {e}")
+            return _token_cache["token"]
 
 
 def get_bot_open_id():
@@ -69,18 +81,24 @@ def get_bot_open_id():
         print(f"[Bot] 获取 open_id 异常: {e}")
 
 
-def call_ai(messages):
-    """调用 AI API，支持多分组多 Key 自动切换，统一 OpenAI 格式"""
+def call_ai(messages, group_name=None):
+    """调用 AI API，支持多分组多 Key 自动切换，统一 OpenAI 格式。
+    group_name: 指定分组名时只用该分组，为 None 时按顺序自动切换。
+    """
     for group in config.AI_GROUPS:
+        # 如果指定了分组，跳过不匹配的
+        if group_name and group["name"].lower() != group_name.lower():
+            continue
+
         api_key = group["key"]
         if not api_key:
-            continue  # 跳过未配置 Key 的分组
+            continue
 
         api_base = group.get("base") or config.AI_API_BASE
         if not api_base:
-            continue  # 跳过未配置 API 地址的分组
+            continue
 
-        group_name = group["name"]
+        g_name = group["name"]
         models = [m.strip() for m in group["models"].split(",") if m.strip()]
 
         for model in models:
@@ -98,21 +116,21 @@ def call_ai(messages):
 
                 resp = requests.post(url, headers=headers, json=payload, timeout=120)
                 result = resp.json()
-                print(f"[AI响应 {group_name}/{model}] {json.dumps(result, ensure_ascii=False)[:200]}")
+                print(f"[AI响应 {g_name}/{model}] {json.dumps(result, ensure_ascii=False)[:200]}")
 
                 if "error" in result:
-                    print(f"[{group_name}/{model} 失败] 尝试下一个...")
+                    print(f"[{g_name}/{model} 失败] 尝试下一个...")
                     continue
 
                 choices = result.get("choices")
                 if not choices:
-                    print(f"[{group_name}/{model} 失败] 响应无 choices，尝试下一个...")
+                    print(f"[{g_name}/{model} 失败] 响应无 choices，尝试下一个...")
                     continue
 
                 return choices[0]["message"]["content"]
 
             except Exception as e:
-                print(f"[{group_name}/{model} 调用失败] {e}")
+                print(f"[{g_name}/{model} 调用失败] {e}")
                 continue
 
     return "抱歉，所有模型都无法回复，请稍后再试。"
@@ -180,6 +198,85 @@ def truncate(text, max_len=MAX_MSG_LEN):
     return text
 
 
+def download_feishu_image(message_id, image_key):
+    """从飞书下载图片，返回 base64 编码字符串"""
+    try:
+        token = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}/resources/{image_key}?type=image"
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200 and resp.content:
+            b64 = base64.b64encode(resp.content).decode("utf-8")
+            content_type = resp.headers.get("Content-Type", "image/jpeg")
+            print(f"[图片] 下载成功, 大小: {len(resp.content)} bytes")
+            return f"data:{content_type};base64,{b64}"
+        else:
+            print(f"[图片] 下载失败: status={resp.status_code}")
+    except Exception as e:
+        print(f"[图片] 下载异常: {e}")
+    return None
+
+
+def handle_command(text, sender_id, chat_id):
+    """处理用户指令，返回回复文本；非指令返回 None"""
+    context_key = f"{sender_id}_{chat_id}"
+    cmd = text.strip().lower()
+
+    if cmd == "/model":
+        # 显示可用分组列表和当前选择
+        with _model_choice_lock:
+            current = user_model_choice.get(context_key, None)
+        lines = ["📋 可用模型分组：\n"]
+        for g in config.AI_GROUPS:
+            has_key = "✅" if g["key"] else "❌"
+            is_current = " 👈 当前" if (current and g["name"].lower() == current.lower()) else ""
+            models = g["models"][:60]
+            lines.append(f"{has_key} **{g['name']}**: {models}{is_current}")
+        lines.append(f"\n当前模式：{'🎯 指定 ' + current if current else '🔄 自动切换'}")
+        lines.append("\n用法：`/model 分组名` 切换，`/auto` 恢复自动")
+        return "\n".join(lines)
+
+    elif cmd.startswith("/model "):
+        # 切换到指定分组
+        target = text.strip()[7:].strip()
+        matched = None
+        for g in config.AI_GROUPS:
+            if g["name"].lower() == target.lower():
+                matched = g["name"]
+                break
+        if matched:
+            with _model_choice_lock:
+                user_model_choice[context_key] = matched
+            return f"✅ 已切换到 **{matched}** 分组"
+        else:
+            names = "、".join(g["name"] for g in config.AI_GROUPS)
+            return f"❌ 未找到分组「{target}」\n可用分组：{names}"
+
+    elif cmd == "/auto":
+        with _model_choice_lock:
+            if context_key in user_model_choice:
+                del user_model_choice[context_key]
+        return "🔄 已恢复自动切换模式"
+
+    elif cmd == "/help":
+        return (
+            "🤖 可用指令：\n\n"
+            "`/model` — 查看可用模型分组\n"
+            "`/model 分组名` — 切换到指定分组\n"
+            "`/auto` — 恢复自动切换模式\n"
+            "`/clear` — 清除对话历史\n"
+            "`/help` — 显示本帮助"
+        )
+
+    elif cmd == "/clear":
+        with _history_lock:
+            if context_key in chat_history:
+                del chat_history[context_key]
+        return "🗑️ 对话历史已清除"
+
+    return None
+
+
 def process_message(event_data):
     """处理消息（在独立线程中运行）"""
     try:
@@ -187,9 +284,9 @@ def process_message(event_data):
         message_id = message.get("message_id")
         chat_id = message.get("chat_id")
         chat_type = message.get("chat_type", "")
+        msg_type = message.get("message_type", "text")
         sender_id = event_data.get("sender", {}).get("sender_id", {}).get("open_id", "unknown")
         content = json.loads(message.get("content", "{}"))
-        text = content.get("text", "").strip()
         mentions = message.get("mentions", [])
 
         # 消息去重（加锁保证线程安全）
@@ -198,6 +295,22 @@ def process_message(event_data):
                 print(f"[去重] {message_id}")
                 return
             processed_messages[message_id] = True
+
+        # 解析文本和图片
+        text = ""
+        image_data_url = None
+
+        if msg_type == "text":
+            text = content.get("text", "").strip()
+        elif msg_type == "image":
+            image_key = content.get("image_key", "")
+            if image_key:
+                image_data_url = download_feishu_image(message_id, image_key)
+            text = "请描述这张图片"  # 默认提示词
+        else:
+            # 暂不支持的消息类型
+            print(f"[跳过] 不支持的消息类型: {msg_type}")
+            return
 
         # 群聊中只回复 @机器人 的消息，私聊全部回复
         if chat_type == "group":
@@ -208,31 +321,60 @@ def process_message(event_data):
                     if mention_id == BOT_OPEN_ID:
                         bot_mentioned = True
                         break
-            if not bot_mentioned:
+            # 图片消息在群聊中也需要 @，但飞书图片消息无法 @，所以私聊才支持图片
+            if not bot_mentioned and msg_type == "text":
                 print(f"[跳过] 群聊消息未@机器人")
+                return
+            elif not bot_mentioned and msg_type == "image":
+                print(f"[跳过] 群聊图片消息未@机器人")
                 return
             for m in mentions:
                 text = text.replace(m.get("key", ""), "").strip()
 
-        if not text:
+        if not text and not image_data_url:
             return
 
-        print(f"[消息] {text[:80]}")
+        # 处理指令
+        if msg_type == "text" and text.startswith("/"):
+            cmd_reply = handle_command(text, sender_id, chat_id)
+            if cmd_reply:
+                reply_card(message_id, cmd_reply)
+                return
+
+        print(f"[消息] type={msg_type}, text={text[:80]}")
 
         # 先回复"思考中..."
         thinking_id = reply_card(message_id, "🤔 思考中...")
 
+        # 构建消息内容（支持图片+文本的 vision 格式）
+        if image_data_url:
+            user_content = [
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+                {"type": "text", "text": text or "请描述这张图片"}
+            ]
+        else:
+            user_content = text
+
         # 构建多轮对话上下文（加锁保证线程安全）
+        # 图片 base64 不存入历史，用文本占位符代替，避免内存爆炸
         context_key = f"{sender_id}_{chat_id}"
+        history_content = f"[图片] {text}" if image_data_url else user_content
+
         with _history_lock:
             if context_key not in chat_history:
                 chat_history[context_key] = deque(maxlen=10)
             history = chat_history[context_key]
-            history.append({"role": "user", "content": text})
+            history.append({"role": "user", "content": history_content})
             messages = list(history)
 
-        # 调用 AI
-        reply_text = call_ai(messages)
+        # 本次请求把最后一条替换为含图片的完整内容（不影响历史存储）
+        if image_data_url:
+            messages[-1] = {"role": "user", "content": user_content}
+
+        # 调用 AI（使用用户选择的模型分组）
+        with _model_choice_lock:
+            chosen_group = user_model_choice.get(context_key)
+        reply_text = call_ai(messages, group_name=chosen_group)
         reply_text = truncate(reply_text)
 
         # 保存回复到上下文
@@ -323,6 +465,23 @@ def health():
 
 
 if __name__ == '__main__':
+    # 启动时校验关键配置
+    missing = []
+    if not config.FEISHU_APP_ID:
+        missing.append("FEISHU_APP_ID")
+    if not config.FEISHU_APP_SECRET:
+        missing.append("FEISHU_APP_SECRET")
+    if not config.FEISHU_VERIFICATION_TOKEN:
+        missing.append("FEISHU_VERIFICATION_TOKEN")
+    has_any_ai = any(g["key"] for g in config.AI_GROUPS)
+    has_any_base = config.AI_API_BASE or any(g.get("base") for g in config.AI_GROUPS)
+    if not has_any_ai:
+        missing.append("至少一个 AI_KEY_*")
+    if not has_any_base:
+        missing.append("AI_API_BASE 或至少一个 AI_BASE_*")
+    if missing:
+        print(f"[警告] 缺少配置: {', '.join(missing)}")
+
     print(f"飞书 Bot 启动中...")
     print(f"监听端口: {config.PORT}")
     get_bot_open_id()

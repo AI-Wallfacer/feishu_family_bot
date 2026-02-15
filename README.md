@@ -1,15 +1,27 @@
 # 🤖 Feishu Family Bot — 飞书群聊 AI 助手
 
-基于 Flask 的飞书群聊智能机器人，支持多 AI 模型自动切换、多轮对话上下文，部署在 Render 云平台。
+基于 Flask 的飞书群聊智能机器人，支持多 AI 模型自动切换、多轮对话、图片识别、聊天指令，部署在 Render 云平台。
 
 ## ✨ 特性
 
-- 多模型分组 & 自动降级：Claude → GPT → 国内模型 → Gemini，按优先级自动切换，单个模型失败自动尝试下一个
-- 多轮对话：基于 sender + chat 维度保留最近 10 轮上下文
+- 多模型分组 & 自动降级：按优先级自动切换，单个模型失败自动尝试下一个
+- 聊天内切换模型：通过 `/model` 指令在飞书中选择模型分组
+- 图片识别：发送图片给 Bot，AI 自动识别并回复（需模型支持 vision）
+- 多轮对话：基于 sender + chat 维度保留最近 10 轮上下文（30 分钟过期）
 - 卡片消息：先回复"🤔 思考中..."，AI 响应后原地更新为实际回复
 - 群聊 @触发：群聊中仅响应 @机器人 的消息，私聊自动回复
-- 消息去重：TTL 缓存防止重复处理（5 分钟窗口，最多 2000 条）
+- 消息去重：TTL 缓存防止重复处理（5 分钟窗口）
 - Token 缓存：飞书 tenant_access_token 自动缓存 & 提前刷新
+
+## 💬 聊天指令
+
+| 指令 | 功能 |
+|------|------|
+| `/model` | 查看可用模型分组和当前选择 |
+| `/model 分组名` | 切换到指定模型分组 |
+| `/auto` | 恢复自动切换模式 |
+| `/clear` | 清除对话历史 |
+| `/help` | 显示帮助信息 |
 
 ## 📁 项目结构
 
@@ -57,22 +69,23 @@
 4. 权限管理 → 添加权限：
    - `im:message`（接收消息）
    - `im:message:send_as_bot`（发送消息）
+   - `im:message:resource`（读取图片资源，图片识别需要）
 5. 发布应用版本，将 Bot 添加到群聊
 
 ## 🔧 自定义
 
 ### 调整模型分组
 
-模型列表也支持通过环境变量覆盖：
+模型列表支持通过环境变量覆盖：
 
 ```bash
 AI_MODELS_CLAUDE="claude-sonnet-4-5-20250929,claude-haiku-4-5"
 AI_MODELS_CODEX="gpt-5.2"
-AI_MODELS_CN="glm-4.7,kimi-k2.5"
+AI_MODELS_CN="glm-5,kimi-k2.5"
 AI_MODELS_GEMINI="gemini-3-pro-preview"
 ```
 
-分组按 `config.py` 中 `AI_GROUPS` 的顺序依次尝试，没有配置 Key 的分组会自动跳过。
+分组按 `config.py` 中 `AI_GROUPS` 的顺序依次尝试，没有配置 Key 的分组会自动跳过。用户也可以在飞书中通过 `/model 分组名` 指令手动切换。
 
 ### 修改机器人人设
 
@@ -85,7 +98,8 @@ AI_MODELS_GEMINI="gemini-3-pro-preview"
 | Bot 没有回复 | 检查 Render 日志、Webhook URL 是否正确、Bot 是否已加入群聊 |
 | AI 调用失败 | 检查 API Key 和余额，查看 Render 日志中的具体错误 |
 | 群聊不回复 | 确认消息中 @了机器人，检查日志中 BOT_OPEN_ID 是否正确获取 |
+| 图片识别不工作 | 确认已添加 `im:message:resource` 权限，且使用的模型支持 vision |
 
-## � License
+## 📄 License
 
 MIT
