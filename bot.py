@@ -306,9 +306,27 @@ def process_message(event_data):
             image_key = content.get("image_key", "")
             if image_key:
                 image_data_url = download_feishu_image(message_id, image_key)
-            text = "请描述这张图片"  # 默认提示词
+            text = "请描述这张图片"
+        elif msg_type == "post":
+            # 富文本消息：提取文本和图片
+            post_content = content.get("content", [])
+            text_parts = []
+            first_image_key = None
+            for line in post_content:
+                for elem in line:
+                    tag = elem.get("tag", "")
+                    if tag == "text":
+                        text_parts.append(elem.get("text", ""))
+                    elif tag == "at":
+                        pass  # @信息由 mentions 处理
+                    elif tag == "img" and not first_image_key:
+                        first_image_key = elem.get("image_key", "")
+            text = "".join(text_parts).strip()
+            if first_image_key:
+                image_data_url = download_feishu_image(message_id, first_image_key)
+                if not text:
+                    text = "请描述这张图片"
         else:
-            # 暂不支持的消息类型
             print(f"[跳过] 不支持的消息类型: {msg_type}")
             return
 
