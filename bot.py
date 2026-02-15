@@ -308,10 +308,10 @@ def process_message(event_data):
                 image_data_url = download_feishu_image(message_id, image_key)
             text = "请描述这张图片"
         elif msg_type == "post":
-            # 富文本消息：提取文本和图片
+            # 富文本消息：提取文本和所有图片
             post_content = content.get("content", [])
             text_parts = []
-            first_image_key = None
+            image_keys = []
             for line in post_content:
                 for elem in line:
                     tag = elem.get("tag", "")
@@ -319,13 +319,19 @@ def process_message(event_data):
                         text_parts.append(elem.get("text", ""))
                     elif tag == "at":
                         pass  # @信息由 mentions 处理
-                    elif tag == "img" and not first_image_key:
-                        first_image_key = elem.get("image_key", "")
+                    elif tag == "img":
+                        key = elem.get("image_key", "")
+                        if key:
+                            image_keys.append(key)
             text = "".join(text_parts).strip()
-            if first_image_key:
-                image_data_url = download_feishu_image(message_id, first_image_key)
+            if image_keys:
+                image_data_url = []
+                for key in image_keys:
+                    url = download_feishu_image(message_id, key)
+                    if url:
+                        image_data_url.append(url)
                 if not text:
-                    text = "请描述这张图片"
+                    text = "请描述这些图片" if len(image_data_url) > 1 else "请描述这张图片"
         else:
             print(f"[跳过] 不支持的消息类型: {msg_type}")
             return
@@ -364,12 +370,12 @@ def process_message(event_data):
         # 先回复"思考中..."
         thinking_id = reply_card(message_id, "🤔 思考中...")
 
-        # 构建消息内容（支持图片+文本的 vision 格式）
+        # 构建消息内容（支持多图片+文本的 vision 格式）
         if image_data_url:
-            user_content = [
-                {"type": "image_url", "image_url": {"url": image_data_url}},
-                {"type": "text", "text": text or "请描述这张图片"}
-            ]
+            # 统一为列表
+            urls = image_data_url if isinstance(image_data_url, list) else [image_data_url]
+            user_content = [{"type": "image_url", "image_url": {"url": u}} for u in urls]
+            user_content.append({"type": "text", "text": text or "请描述这些图片"})
         else:
             user_content = text
 
