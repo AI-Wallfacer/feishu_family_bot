@@ -217,21 +217,49 @@ def download_feishu_image(message_id, image_key):
     return None
 
 
+def check_group_connectivity(group):
+    """快速检测分组 API 是否可连通"""
+    api_key = group.get("key")
+    if not api_key:
+        return "未配置Key"
+    api_base = group.get("base") or config.AI_API_BASE
+    if not api_base:
+        return "未配置地址"
+    try:
+        url = f"{api_base}/v1/models"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            return "可用"
+        else:
+            return f"异常({resp.status_code})"
+    except requests.Timeout:
+        return "超时"
+    except Exception:
+        return "不可达"
+
+
 def handle_command(text, sender_id, chat_id):
     """处理用户指令，返回回复文本；非指令返回 None"""
     context_key = f"{sender_id}_{chat_id}"
     cmd = text.strip().lower()
 
     if cmd == "/model":
-        # 显示可用分组列表和当前选择
+        # 显示可用分组列表，并检测连通性
         with _model_choice_lock:
             current = user_model_choice.get(context_key, None)
         lines = ["📋 可用模型分组：\n"]
         for g in config.AI_GROUPS:
-            has_key = "✅" if g["key"] else "❌"
+            status = check_group_connectivity(g)
+            if status == "可用":
+                icon = "✅"
+            elif status == "未配置Key" or status == "未配置地址":
+                icon = "⬜"
+            else:
+                icon = "❌"
             is_current = " 👈 当前" if (current and g["name"].lower() == current.lower()) else ""
             models = g["models"][:60]
-            lines.append(f"{has_key} **{g['name']}**: {models}{is_current}")
+            lines.append(f"{icon} **{g['name']}**: {models} ({status}){is_current}")
         lines.append(f"\n当前模式：{'🎯 指定 ' + current if current else '🔄 自动切换'}")
         lines.append("\n用法：`/model 分组名` 切换，`/auto` 恢复自动")
         return "\n".join(lines)
