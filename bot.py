@@ -192,7 +192,28 @@ def update_card(message_id, text):
         print(f"更新消息失败: {e}")
 
 
+def clean_math_format(text):
+    """清理 LaTeX 数学格式，转换为纯文本"""
+    import re
+    # 移除行内公式 $...$
+    text = re.sub(r'\$([^\$]+)\$', r'\1', text)
+    # 移除块级公式 $$...$$
+    text = re.sub(r'\$\$([^\$]+)\$\$', r'\n\1\n', text)
+    # 转换常见 LaTeX 命令
+    replacements = {
+        r'\times': '×', r'\div': '÷', r'\pm': '±',
+        r'\leq': '≤', r'\geq': '≥', r'\neq': '≠',
+        r'\approx': '≈', r'\sqrt': '√', r'\sum': '∑',
+        r'\int': '∫', r'\infty': '∞', r'\alpha': 'α',
+        r'\beta': 'β', r'\gamma': 'γ', r'\pi': 'π',
+        r'\theta': 'θ', r'\lambda': 'λ'
+    }
+    for latex, unicode_char in replacements.items():
+        text = text.replace(latex, unicode_char)
+    return text
+
 def truncate(text, max_len=MAX_MSG_LEN):
+    text = clean_math_format(text)
     if len(text) > max_len:
         return text[:max_len - 20] + "\n\n...(消息过长已截断)"
     return text
