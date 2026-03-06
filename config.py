@@ -1,4 +1,15 @@
+import json
 import os
+
+
+def _load_json_env(key, default):
+    raw = os.environ.get(key)
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return default
 
 # 飞书配置（必须通过环境变量设置）
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "")
@@ -13,16 +24,25 @@ AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "4096"))
 # 多分组模型配置：每组有自己的 Key、API 地址和模型列表，按优先级排列
 AI_GROUPS = [
     {
+        "name": "GPT",
+        "key": os.environ.get("AI_KEY_GPT")
+            or os.environ.get("AI_KEY_OPENAI")
+            or os.environ.get("AI_KEY_CODEX", ""),
+        "base": os.environ.get("AI_BASE_GPT")
+            or os.environ.get("AI_BASE_OPENAI")
+            or os.environ.get("AI_BASE_CODEX", ""),
+        "models": os.environ.get("AI_MODELS_GPT")
+            or os.environ.get("AI_MODELS_OPENAI")
+            or os.environ.get(
+                "AI_MODELS_CODEX",
+                "gpt-5.4,gpt-5.3,gpt-5.2"
+            )
+    },
+    {
         "name": "Claude",
         "key": os.environ.get("AI_KEY_CLAUDE", ""),
         "base": os.environ.get("AI_BASE_CLAUDE", ""),
         "models": os.environ.get("AI_MODELS_CLAUDE", "claude-opus-4-6,claude-sonnet-4-5-20250929,claude-haiku-4-5")
-    },
-    {
-        "name": "codex",
-        "key": os.environ.get("AI_KEY_CODEX", ""),
-        "base": os.environ.get("AI_BASE_CODEX", ""),
-        "models": os.environ.get("AI_MODELS_CODEX", "gpt-5.2")
     },
     {
         "name": "国内模型",
@@ -34,7 +54,7 @@ AI_GROUPS = [
         "name": "Gemini",
         "key": os.environ.get("AI_KEY_GEMINI", ""),
         "base": os.environ.get("AI_BASE_GEMINI", ""),
-        "models": os.environ.get("AI_MODELS_GEMINI", "gemini-3-pro-preview,gemini-3-flash-preview")
+        "models": os.environ.get("AI_MODELS_GEMINI", "gemini-3-flash-preview,gemini-3.1-pro-preview")
     },
 ]
 
@@ -61,3 +81,12 @@ SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", """你是一个温馨的家庭�
 
 # 服务配置
 PORT = int(os.environ.get("PORT", "5000"))
+MESSAGE_WORKERS = int(os.environ.get("MESSAGE_WORKERS", "2"))
+
+# 家庭成员名称映射
+FAMILY_MEMBER_NAME_MAP = _load_json_env("FAMILY_MEMBER_NAME_MAP", {
+    "派小星": "哥哥",
+    "杨": "妈妈",
+    "张哥": "老爸",
+    "乔英子": "妹妹",
+})

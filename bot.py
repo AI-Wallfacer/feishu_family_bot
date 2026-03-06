@@ -3,6 +3,7 @@ import time
 import base64
 import traceback
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from collections import deque
 from cachetools import TTLCache
@@ -23,6 +24,10 @@ _history_lock = threading.Lock()
 user_model_choice = TTLCache(maxsize=500, ttl=1800)
 _model_choice_lock = threading.Lock()
 
+# 用户名称缓存（12 小时）
+user_name_cache = TTLCache(maxsize=500, ttl=43200)
+_user_name_lock = threading.Lock()
+
 # 飞书消息最大长度
 MAX_MSG_LEN = 4000
 
@@ -32,6 +37,16 @@ BOT_OPEN_ID = None
 # 飞书 tenant_access_token 缓存
 _token_cache = {"token": None, "expire_at": 0}
 _token_lock = threading.Lock()
+_message_executor = ThreadPoolExecutor(max_workers=config.MESSAGE_WORKERS)
+
+
+def _log_message_task_result(future):
+    """回收线程池任务异常，避免后台异常静默丢失。"""
+    try:
+        future.result()
+    except Exception:
+        print("[错误] 消息任务执行失败")
+        traceback.print_exc()
 
 
 def get_tenant_access_token():
@@ -79,6 +94,51 @@ def get_bot_open_id():
             print(f"[Bot] 获取 open_id 失败: {data}")
     except Exception as e:
         print(f"[Bot] 获取 open_id 异常: {e}")
+
+
+def get_user_display_name(user_open_id):
+    """根据 open_id 获取飞书用户名称，用于家庭成员身份识别。"""
+    if not user_open_id or user_open_id == "unknown":
+        return None
+
+    with _user_name_lock:
+        cached_name = user_name_cache.get(user_open_id)
+    if cached_name:
+        return cached_name
+
+    try:
+        token = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/contact/v3/users/{user_open_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        params = {"user_id_type": "open_id"}
+        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        data = resp.json()
+        if data.get("code") != 0:
+            print(f"[User] 获取名称失败: {data}")
+            return None
+
+        user = data.get("data", {}).get("user", {})
+        name = user.get("name") or user.get("en_name")
+        if name:
+            with _user_name_lock:
+                user_name_cache[user_open_id] = name
+            return name
+    except Exception as e:
+        print(f"[User] 获取名称异常: {e}")
+    return None
+
+
+def build_sender_context(sender_open_id):
+    """基于群内名称映射构建发言人上下文。"""
+    display_name = get_user_display_name(sender_open_id)
+    if not display_name:
+        return ""
+
+    family_role = config.FAMILY_MEMBER_NAME_MAP.get(display_name.strip())
+    if not family_role:
+        return ""
+
+    return f"[当前发言人: {family_role}，群内名称: {display_name}] "
 
 
 def call_ai(messages, group_name=None):
@@ -192,28 +252,81 @@ def update_card(message_id, text):
         print(f"更新消息失败: {e}")
 
 
+def looks_like_math_text(text):
+    """只在疑似公式场景下做清洗，避免误伤普通对话文本。"""
+    markers = (
+        "$", r"\(", r"\)", r"\[", r"\]", r"\frac", r"\sqrt", r"\sum",
+        r"\int", r"\times", r"\cdot", r"\div", r"\leq", r"\geq",
+        r"\neq", r"\approx", r"\alpha", r"\beta", r"\gamma", r"\pi",
+        r"\theta", r"\lambda", r"\pm"
+    )
+    return any(marker in text for marker in markers)
+
+
 def clean_math_format(text):
-    """清理 LaTeX 数学格式，转换为纯文本"""
+    """将常见 LaTeX 公式转成更适合飞书展示的纯文本。"""
     import re
-    # 移除行内公式 $...$
-    text = re.sub(r'\$([^\$]+)\$', r'\1', text)
-    # 移除块级公式 $$...$$
-    text = re.sub(r'\$\$([^\$]+)\$\$', r'\n\1\n', text)
-    # 转换常见 LaTeX 命令
+
+    if not looks_like_math_text(text):
+        return text
+
+    def unwrap_inline(match):
+        return match.group(1).strip()
+
+    def unwrap_block(match):
+        return f"\n{match.group(1).strip()}\n"
+
+    # 先去掉常见数学定界符
+    text = re.sub(r"\$\$(.+?)\$\$", unwrap_block, text, flags=re.S)
+    text = re.sub(r"\$(.+?)\$", unwrap_inline, text, flags=re.S)
+    text = re.sub(r"\\\[(.+?)\\\]", unwrap_block, text, flags=re.S)
+    text = re.sub(r"\\\((.+?)\\\)", unwrap_inline, text, flags=re.S)
+
+    # 处理更结构化的 LaTeX 语法
+    frac_pattern = re.compile(r"\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}")
+    while frac_pattern.search(text):
+        text = frac_pattern.sub(r"(\1)/(\2)", text)
+
+    text = re.sub(r"\\sqrt\s*\{([^{}]+)\}", r"sqrt(\1)", text)
+    text = re.sub(r"\\sqrt\s+([A-Za-z0-9]+)", r"sqrt(\1)", text)
+    text = re.sub(r"\^\{([^{}]+)\}", r"^(\1)", text)
+    text = re.sub(r"_\{([^{}]+)\}", r"_(\1)", text)
+    text = re.sub(r"\\(?:text|mathrm|operatorname)\{([^{}]+)\}", r"\1", text)
+
     replacements = {
-        r'\times': '×', r'\div': '÷', r'\pm': '±',
-        r'\leq': '≤', r'\geq': '≥', r'\neq': '≠',
-        r'\approx': '≈', r'\sqrt': '√', r'\sum': '∑',
-        r'\int': '∫', r'\infty': '∞', r'\alpha': 'α',
-        r'\beta': 'β', r'\gamma': 'γ', r'\pi': 'π',
-        r'\theta': 'θ', r'\lambda': 'λ'
+        r"\times": " * ",
+        r"\cdot": " * ",
+        r"\div": " / ",
+        r"\pm": " +/- ",
+        r"\leq": " <= ",
+        r"\geq": " >= ",
+        r"\neq": " != ",
+        r"\approx": " ~= ",
+        r"\sum": "sum",
+        r"\int": "integral",
+        r"\infty": "infinity",
+        r"\alpha": "alpha",
+        r"\beta": "beta",
+        r"\gamma": "gamma",
+        r"\pi": "pi",
+        r"\theta": "theta",
+        r"\lambda": "lambda",
+        r"\left": "",
+        r"\right": "",
     }
-    for latex, unicode_char in replacements.items():
-        text = text.replace(latex, unicode_char)
-    return text
+    for latex, plain_text in replacements.items():
+        text = text.replace(latex, plain_text)
+
+    # 清掉剩余的 LaTeX 转义前缀，但尽量保留内容本身
+    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
+    text = text.replace("{", "(").replace("}", ")")
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 def truncate(text, max_len=MAX_MSG_LEN):
-    text = clean_math_format(text)
+    if looks_like_math_text(text):
+        text = clean_math_format(text)
     if len(text) > max_len:
         return text[:max_len - 20] + "\n\n...(消息过长已截断)"
     return text
@@ -337,6 +450,7 @@ def process_message(event_data):
         sender_id = event_data.get("sender", {}).get("sender_id", {}).get("open_id", "unknown")
         content = json.loads(message.get("content", "{}"))
         mentions = message.get("mentions", [])
+        sender_context = build_sender_context(sender_id)
 
         # 消息去重（加锁保证线程安全）
         with _dedup_lock:
@@ -424,14 +538,19 @@ def process_message(event_data):
             # 统一为列表
             urls = image_data_url if isinstance(image_data_url, list) else [image_data_url]
             user_content = [{"type": "image_url", "image_url": {"url": u}} for u in urls]
-            user_content.append({"type": "text", "text": text or "请描述这些图片"})
+            prompt_text = text or "请描述这些图片"
+            if sender_context:
+                prompt_text = f"{sender_context}{prompt_text}"
+            user_content.append({"type": "text", "text": prompt_text})
         else:
-            user_content = text
+            user_content = f"{sender_context}{text}" if sender_context else text
 
         # 构建多轮对话上下文（加锁保证线程安全）
         # 图片 base64 不存入历史，用文本占位符代替，避免内存爆炸
         context_key = f"{sender_id}_{chat_id}"
-        history_content = f"[图片] {text}" if image_data_url else user_content
+        history_content = f"[图片] {text}" if image_data_url else text
+        if sender_context:
+            history_content = f"{sender_context}{history_content}"
 
         with _history_lock:
             if context_key not in chat_history:
@@ -496,8 +615,8 @@ def handle_webhook():
         print(f"[事件] 类型: {event_type}")
 
         if event_type == "im.message.receive_v1":
-            t = threading.Thread(target=process_message, args=(event,), daemon=True)
-            t.start()
+            future = _message_executor.submit(process_message, event)
+            future.add_done_callback(_log_message_task_result)
 
         return jsonify({"code": 0})
 
