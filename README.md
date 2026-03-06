@@ -1,17 +1,19 @@
 # 🤖 Feishu Family Bot — 飞书群聊 AI 助手
 
-基于 Flask 的飞书群聊智能机器人，支持多 AI 模型自动切换、多轮对话、图片识别、聊天指令，部署在 Render 云平台。
+基于 Flask 的飞书群聊智能机器人，支持多 AI 模型自动切换、多轮对话、图片识别、聊天指令，适合部署在 Render 免费实例上做家庭群轻量使用。
 
 ## ✨ 特性
 
 - 多模型分组 & 自动降级：按优先级自动切换，单个模型失败自动尝试下一个
+- 默认 GPT 分组：开箱即用支持 `gpt-5.4,gpt-5.3,gpt-5.2`
 - 聊天内切换模型：通过 `/model` 指令在飞书中选择模型分组
 - 图片识别：发送图片给 Bot，AI 自动识别并回复（需模型支持 vision）
 - 多轮对话：基于 sender + chat 维度保留最近 10 轮上下文（30 分钟过期）
-- 卡片消息：先回复"🤔 思考中..."，AI 响应后原地更新为实际回复
+- 文本回复优化：默认使用更自然的普通文本消息，减少飞书卡片 markdown 显示问题
 - 群聊 @触发：群聊中仅响应 @机器人 的消息，私聊自动回复
 - 消息去重：TTL 缓存防止重复处理（5 分钟窗口）
 - Token 缓存：飞书 tenant_access_token 自动缓存 & 提前刷新
+- 家庭成员名称映射：可按名称识别家人身份并注入到上下文
 
 ## 💬 聊天指令
 
@@ -59,7 +61,12 @@
 | `AI_KEY_GEMINI` | Gemini 分组 API Key | 至少填一组 |
 | `AI_BASE_GEMINI` | Gemini 分组 API 地址（不填则用全局） | ❌ |
 | `AI_MAX_TOKENS` | 最大输出 token 数（默认 4096） | ❌ |
+| `AI_MODELS_CODEX` | GPT 分组模型列表（默认 `gpt-5.4,gpt-5.3,gpt-5.2`） | ❌ |
+| `AI_MODELS_GEMINI` | Gemini 分组模型列表（默认 `gemini-3-flash-preview,gemini-3.1-pro-preview`） | ❌ |
 | `SYSTEM_PROMPT` | 自定义机器人人设提示词 | ❌ |
+| `MESSAGE_WORKERS` | 后台消息处理线程数（默认 `2`） | ❌ |
+| `FEISHU_REPLY_STYLE` | 回复样式，默认 `text`，可选 `card` | ❌ |
+| `FAMILY_MEMBER_NAME_MAP` | 家庭成员名称映射 JSON | ❌ |
 
 ### 4. 配置飞书 Webhook
 
@@ -72,6 +79,14 @@
    - `im:message:resource`（读取图片资源，图片识别需要）
 5. 发布应用版本，将 Bot 添加到群聊
 
+### 5. Render 免费实例注意事项
+
+- Render 免费 Web Service 大约 15 分钟无请求会休眠
+- 休眠后再次收到请求，冷启动可能会延迟几十秒
+- 如果你只是家庭群轻量使用，免费实例通常够用，但不适合高并发和长期后台任务
+- 建议用 `cron-job.org` 或其他外部保活服务每 14 分钟访问一次 `/health`
+- 保活只解决冷启动问题，不等于长期记忆或后台常驻任务
+
 ## 🔧 自定义
 
 ### 调整模型分组
@@ -80,9 +95,9 @@
 
 ```bash
 AI_MODELS_CLAUDE="claude-sonnet-4-5-20250929,claude-haiku-4-5"
-AI_MODELS_CODEX="gpt-5.2"
+AI_MODELS_CODEX="gpt-5.4,gpt-5.3,gpt-5.2"
 AI_MODELS_CN="glm-5,kimi-k2.5"
-AI_MODELS_GEMINI="gemini-3-pro-preview"
+AI_MODELS_GEMINI="gemini-3-flash-preview,gemini-3.1-pro-preview"
 ```
 
 分组按 `config.py` 中 `AI_GROUPS` 的顺序依次尝试，没有配置 Key 的分组会自动跳过。用户也可以在飞书中通过 `/model 分组名` 指令手动切换。
@@ -90,6 +105,33 @@ AI_MODELS_GEMINI="gemini-3-pro-preview"
 ### 修改机器人人设
 
 设置环境变量 `SYSTEM_PROMPT` 即可自定义机器人性格和能力，默认人设为家庭助手。
+
+### 配置家庭成员名称映射
+
+如果你希望机器人按家庭成员名称识别发言人，可以设置：
+
+```bash
+FAMILY_MEMBER_NAME_MAP='{"派小星":"哥哥","杨":"妈妈","张哥":"老爸","乔英子":"妹妹"}'
+```
+
+说明：
+
+- 这是基于名称的轻量识别，不如 `open_id` 绑定稳定
+- 适合固定家庭群、低频使用场景
+- 如果飞书返回的名称与群里显示名称不一致，可能识别不到
+
+### 推荐的 Render 免费实例配置
+
+```bash
+MESSAGE_WORKERS=2
+FEISHU_REPLY_STYLE=text
+AI_MAX_TOKENS=4096
+```
+
+说明：
+
+- `MESSAGE_WORKERS=2` 更适合 Render 免费实例的 `0.1 CPU / 512 MB`
+- `FEISHU_REPLY_STYLE=text` 可以避免飞书卡片 markdown 显示不稳定的问题
 
 ## ❓ 常见问题
 
@@ -99,6 +141,8 @@ AI_MODELS_GEMINI="gemini-3-pro-preview"
 | AI 调用失败 | 检查 API Key 和余额，查看 Render 日志中的具体错误 |
 | 群聊不回复 | 确认消息中 @了机器人，检查日志中 BOT_OPEN_ID 是否正确获取 |
 | 图片识别不工作 | 确认已添加 `im:message:resource` 权限，且使用的模型支持 vision |
+| Render 访问变慢 | 很可能是免费实例休眠后的冷启动，确认是否已配置 14 分钟保活访问 `/health` |
+| 家庭成员识别不生效 | 检查 `FAMILY_MEMBER_NAME_MAP` 是否正确，确认飞书返回的名称是否与映射一致 |
 
 ## 📄 License
 

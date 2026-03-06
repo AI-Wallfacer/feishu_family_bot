@@ -82,6 +82,7 @@ SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", """你是一个温馨的家庭�
 # 服务配置
 PORT = int(os.environ.get("PORT", "5000"))
 MESSAGE_WORKERS = int(os.environ.get("MESSAGE_WORKERS", "2"))
+FEISHU_REPLY_STYLE = os.environ.get("FEISHU_REPLY_STYLE", "text").strip().lower()
 
 # 家庭成员名称映射
 FAMILY_MEMBER_NAME_MAP = _load_json_env("FAMILY_MEMBER_NAME_MAP", {

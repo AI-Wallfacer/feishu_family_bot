@@ -142,11 +142,8 @@ def build_sender_context(sender_open_id):
 
 
 def call_ai(messages, group_name=None):
-    """调用 AI API，支持多分组多 Key 自动切换，统一 OpenAI 格式。
-    group_name: 指定分组名时只用该分组，为 None 时按顺序自动切换。
-    """
+    """调用 AI API，支持多分组回退。"""
     for group in config.AI_GROUPS:
-        # 如果指定了分组，跳过不匹配的
         if group_name and group["name"].lower() != group_name.lower():
             continue
 
@@ -203,6 +200,20 @@ def build_card(text):
     })
 
 
+def build_text_content(text):
+    return json.dumps({"text": text})
+
+
+def normalize_reply_text(text):
+    """尽量保留内容，但去掉飞书文本里表现较差的少量 markdown。"""
+    import re
+
+    text = text.replace("**", "")
+    text = text.replace("```", "")
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
+    return text.strip()
+
+
 def reply_card(message_id, text):
     """用卡片消息回复，返回回复消息的 message_id"""
     try:
@@ -227,6 +238,40 @@ def reply_card(message_id, text):
     except Exception as e:
         print(f"回复消息失败: {e}")
     return None
+
+
+def reply_text(message_id, text):
+    """用普通文本消息回复，返回回复消息的 message_id。"""
+    try:
+        token = get_tenant_access_token()
+        url = f"https://open.feishu.cn/open-apis/im/v1/messages/{message_id}/reply"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "msg_type": "text",
+            "content": build_text_content(normalize_reply_text(text))
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=10)
+        result = resp.json()
+        if result.get("code") == 0:
+            return result.get("data", {}).get("message_id")
+        print(f"发送文本消息失败: {result.get('code')}, {result.get('msg')}")
+    except Exception as e:
+        print(f"发送文本消息失败: {e}")
+    return None
+
+
+def send_final_reply(message_id, text, thinking_id=None):
+    """统一发送正式回复。"""
+    normalized_text = normalize_reply_text(text)
+    if thinking_id:
+        update_card(thinking_id, normalized_text)
+        return thinking_id
+    if config.FEISHU_REPLY_STYLE == "card":
+        return reply_card(message_id, normalized_text)
+    return reply_text(message_id, normalized_text)
 
 
 def update_card(message_id, text):
@@ -525,13 +570,15 @@ def process_message(event_data):
         if msg_type == "text" and text.startswith("/"):
             cmd_reply = handle_command(text, sender_id, chat_id)
             if cmd_reply:
-                reply_card(message_id, cmd_reply)
+                if config.FEISHU_REPLY_STYLE == "card":
+                    reply_card(message_id, cmd_reply)
+                else:
+                    reply_text(message_id, cmd_reply)
                 return
 
         print(f"[消息] type={msg_type}, text={text[:80]}")
 
-        # 先回复"思考中..."
-        thinking_id = reply_card(message_id, "🤔 思考中...")
+        thinking_id = None
 
         # 构建消息内容（支持多图片+文本的 vision 格式）
         if image_data_url:
@@ -574,11 +621,7 @@ def process_message(event_data):
             if context_key in chat_history:
                 chat_history[context_key].append({"role": "assistant", "content": reply_text})
 
-        # 更新卡片为实际回复
-        if thinking_id:
-            update_card(thinking_id, reply_text)
-        else:
-            reply_card(message_id, reply_text)
+        send_final_reply(message_id, reply_text, thinking_id=thinking_id)
 
         print(f"[完成] 回复: {reply_text[:50]}")
 
