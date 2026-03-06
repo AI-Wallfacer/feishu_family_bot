@@ -267,8 +267,11 @@ def send_final_reply(message_id, text, thinking_id=None):
     """统一发送正式回复。"""
     normalized_text = normalize_reply_text(text)
     if thinking_id:
-        update_card(thinking_id, normalized_text)
-        return thinking_id
+        if config.FEISHU_REPLY_STYLE == "card":
+            update_card(thinking_id, normalized_text)
+            return thinking_id
+        update_card(thinking_id, "✅ 已生成回复，请查看下方消息")
+        return reply_text(message_id, normalized_text)
     if config.FEISHU_REPLY_STYLE == "card":
         return reply_card(message_id, normalized_text)
     return reply_text(message_id, normalized_text)
@@ -570,15 +573,12 @@ def process_message(event_data):
         if msg_type == "text" and text.startswith("/"):
             cmd_reply = handle_command(text, sender_id, chat_id)
             if cmd_reply:
-                if config.FEISHU_REPLY_STYLE == "card":
-                    reply_card(message_id, cmd_reply)
-                else:
-                    reply_text(message_id, cmd_reply)
+                reply_card(message_id, cmd_reply)
                 return
 
         print(f"[消息] type={msg_type}, text={text[:80]}")
 
-        thinking_id = None
+        thinking_id = reply_card(message_id, "🤔 思考中...")
 
         # 构建消息内容（支持多图片+文本的 vision 格式）
         if image_data_url:
