@@ -24,10 +24,6 @@ _history_lock = threading.Lock()
 user_model_choice = TTLCache(maxsize=500, ttl=1800)
 _model_choice_lock = threading.Lock()
 
-# 用户名称缓存（12 小时）
-user_name_cache = TTLCache(maxsize=500, ttl=43200)
-_user_name_lock = threading.Lock()
-
 # 飞书消息最大长度
 MAX_MSG_LEN = 4000
 
@@ -94,51 +90,6 @@ def get_bot_open_id():
             print(f"[Bot] 获取 open_id 失败: {data}")
     except Exception as e:
         print(f"[Bot] 获取 open_id 异常: {e}")
-
-
-def get_user_display_name(user_open_id):
-    """根据 open_id 获取飞书用户名称，用于家庭成员身份识别。"""
-    if not user_open_id or user_open_id == "unknown":
-        return None
-
-    with _user_name_lock:
-        cached_name = user_name_cache.get(user_open_id)
-    if cached_name:
-        return cached_name
-
-    try:
-        token = get_tenant_access_token()
-        url = f"https://open.feishu.cn/open-apis/contact/v3/users/{user_open_id}"
-        headers = {"Authorization": f"Bearer {token}"}
-        params = {"user_id_type": "open_id"}
-        resp = requests.get(url, headers=headers, params=params, timeout=10)
-        data = resp.json()
-        if data.get("code") != 0:
-            print(f"[User] 获取名称失败: {data}")
-            return None
-
-        user = data.get("data", {}).get("user", {})
-        name = user.get("name") or user.get("en_name")
-        if name:
-            with _user_name_lock:
-                user_name_cache[user_open_id] = name
-            return name
-    except Exception as e:
-        print(f"[User] 获取名称异常: {e}")
-    return None
-
-
-def build_sender_context(sender_open_id):
-    """基于群内名称映射构建发言人上下文。"""
-    display_name = get_user_display_name(sender_open_id)
-    if not display_name:
-        return ""
-
-    family_role = config.FAMILY_MEMBER_NAME_MAP.get(display_name.strip())
-    if not family_role:
-        return ""
-
-    return f"[当前发言人: {family_role}，群内名称: {display_name}] "
 
 
 def call_ai(messages, group_name=None):
@@ -265,13 +216,12 @@ def reply_text(message_id, text):
 
 def send_final_reply(message_id, text, thinking_id=None):
     """统一发送正式回复。"""
-    normalized_text = normalize_reply_text(text)
     if thinking_id:
-        update_card(thinking_id, normalized_text)
+        update_card(thinking_id, text)
         return thinking_id
     if config.FEISHU_REPLY_STYLE == "card":
-        return reply_card(message_id, normalized_text)
-    return reply_text(message_id, normalized_text)
+        return reply_card(message_id, text)
+    return reply_text(message_id, text)
 
 
 def update_card(message_id, text):
@@ -396,46 +346,36 @@ def download_feishu_image(message_id, image_key):
     return None
 
 
-def check_group_connectivity(group):
-    """快速检测分组 API 是否可连通"""
-    api_key = group.get("key")
-    if not api_key:
-        return "未配置Key"
-    api_base = group.get("base") or config.AI_API_BASE
-    if not api_base:
-        return "未配置地址"
-    try:
-        url = f"{api_base}/v1/models"
-        headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get(url, headers=headers, timeout=5)
-        if resp.status_code == 200:
-            return "可用"
-        else:
-            return f"异常({resp.status_code})"
-    except requests.Timeout:
-        return "超时"
-    except Exception:
-        return "不可达"
-
-
 def handle_command(text, sender_id, chat_id):
     """处理用户指令，返回回复文本；非指令返回 None"""
     context_key = f"{sender_id}_{chat_id}"
     cmd = text.strip().lower()
 
     if cmd == "/model":
-        # 显示可用分组列表，并检测连通性
+        # 快速显示分组配置，不依赖外部接口连通性
         with _model_choice_lock:
             current = user_model_choice.get(context_key, None)
-        lines = ["📋 可用模型分组：\n"]
+        lines = [
+            "📋 模型分组配置：",
+            "",
+            "以下显示的是本地配置状态，不代表实时接口连通性。",
+            ""
+        ]
         for g in config.AI_GROUPS:
-            status = check_group_connectivity(g)
-            if status == "可用":
+            has_key = bool(g.get("key"))
+            has_base = bool(g.get("base") or config.AI_API_BASE)
+            if has_key and has_base:
                 icon = "✅"
-            elif status == "未配置Key" or status == "未配置地址":
-                icon = "⬜"
+                status = "已配置 key/base"
+            elif has_key:
+                icon = "🟨"
+                status = "仅已配置 key"
+            elif has_base:
+                icon = "🟨"
+                status = "仅已配置 base"
             else:
-                icon = "❌"
+                icon = "⬜"
+                status = "未配置"
             is_current = " 👈 当前" if (current and g["name"].lower() == current.lower()) else ""
             models = g["models"][:60]
             lines.append(f"{icon} **{g['name']}**: {models} ({status}){is_current}")
@@ -468,7 +408,7 @@ def handle_command(text, sender_id, chat_id):
     elif cmd == "/help":
         return (
             "🤖 可用指令：\n\n"
-            "`/model` — 查看可用模型分组\n"
+            "`/model` — 查看模型分组配置和当前选择\n"
             "`/model 分组名` — 切换到指定分组\n"
             "`/auto` — 恢复自动切换模式\n"
             "`/clear` — 清除对话历史\n"
@@ -495,7 +435,6 @@ def process_message(event_data):
         sender_id = event_data.get("sender", {}).get("sender_id", {}).get("open_id", "unknown")
         content = json.loads(message.get("content", "{}"))
         mentions = message.get("mentions", [])
-        sender_context = build_sender_context(sender_id)
 
         # 消息去重（加锁保证线程安全）
         with _dedup_lock:
@@ -579,31 +518,29 @@ def process_message(event_data):
         print(f"[消息] type={msg_type}, text={text[:80]}")
 
         thinking_id = None
+        if config.FEISHU_REPLY_STYLE == "card":
+            thinking_id = reply_card(message_id, "🤔 思考中...")
 
         # 构建消息内容（支持多图片+文本的 vision 格式）
         if image_data_url:
             # 统一为列表
             urls = image_data_url if isinstance(image_data_url, list) else [image_data_url]
             user_content = [{"type": "image_url", "image_url": {"url": u}} for u in urls]
-            prompt_text = text or "请描述这些图片"
-            if sender_context:
-                prompt_text = f"{sender_context}{prompt_text}"
-            user_content.append({"type": "text", "text": prompt_text})
+            user_content.append({"type": "text", "text": text or "请描述这些图片"})
         else:
-            user_content = f"{sender_context}{text}" if sender_context else text
+            user_content = text
 
         # 构建多轮对话上下文（加锁保证线程安全）
         # 图片 base64 不存入历史，用文本占位符代替，避免内存爆炸
         context_key = f"{sender_id}_{chat_id}"
         history_content = f"[图片] {text}" if image_data_url else text
-        if sender_context:
-            history_content = f"{sender_context}{history_content}"
 
         with _history_lock:
-            if context_key not in chat_history:
-                chat_history[context_key] = deque(maxlen=10)
-            history = chat_history[context_key]
+            history = chat_history.get(context_key)
+            if history is None:
+                history = deque(maxlen=10)
             history.append({"role": "user", "content": history_content})
+            chat_history[context_key] = history
             messages = list(history)
 
         # 本次请求把最后一条替换为含图片的完整内容（不影响历史存储）
@@ -613,17 +550,19 @@ def process_message(event_data):
         # 调用 AI（使用用户选择的模型分组）
         with _model_choice_lock:
             chosen_group = user_model_choice.get(context_key)
-        reply_text = call_ai(messages, group_name=chosen_group)
-        reply_text = truncate(reply_text)
+        ai_reply_text = call_ai(messages, group_name=chosen_group)
+        ai_reply_text = truncate(ai_reply_text)
 
         # 保存回复到上下文
         with _history_lock:
-            if context_key in chat_history:
-                chat_history[context_key].append({"role": "assistant", "content": reply_text})
+            history = chat_history.get(context_key)
+            if history is not None:
+                history.append({"role": "assistant", "content": ai_reply_text})
+                chat_history[context_key] = history
 
-        send_final_reply(message_id, reply_text, thinking_id=thinking_id)
+        send_final_reply(message_id, ai_reply_text, thinking_id=thinking_id)
 
-        print(f"[完成] 回复: {reply_text[:50]}")
+        print(f"[完成] 回复: {ai_reply_text[:50]}")
 
     except Exception as e:
         print(f"处理消息失败: {e}")

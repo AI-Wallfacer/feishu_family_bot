@@ -1,15 +1,4 @@
-import json
 import os
-
-
-def _load_json_env(key, default):
-    raw = os.environ.get(key)
-    if not raw:
-        return default
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return default
 
 # 飞书配置（必须通过环境变量设置）
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID", "")
@@ -18,8 +7,8 @@ FEISHU_VERIFICATION_TOKEN = os.environ.get("FEISHU_VERIFICATION_TOKEN", "")
 FEISHU_ENCRYPT_KEY = os.environ.get("FEISHU_ENCRYPT_KEY", "")
 
 # AI API 配置
-AI_API_BASE = os.environ.get("AI_API_BASE", "")  # 全局默认，分组未配置时使用
-AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "4096"))
+AI_API_BASE = os.environ.get("AI_API_BASE", "")  # 全局默认，分组未单独配置时使用
+AI_MAX_TOKENS = int(os.environ.get("AI_MAX_TOKENS", "2048"))
 
 # 多分组模型配置：每组有自己的 Key、API 地址和模型列表，按优先级排列
 AI_GROUPS = [
@@ -54,7 +43,7 @@ AI_GROUPS = [
         "name": "Gemini",
         "key": os.environ.get("AI_KEY_GEMINI", ""),
         "base": os.environ.get("AI_BASE_GEMINI", ""),
-        "models": os.environ.get("AI_MODELS_GEMINI", "gemini-3-flash-preview,gemini-3.1-pro-preview")
+        "models": os.environ.get("AI_MODELS_GEMINI", "gemini-3.1-pro-preview,gemini-3-pro")
     },
 ]
 
@@ -82,12 +71,4 @@ SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", """你是一个温馨的家庭�
 # 服务配置
 PORT = int(os.environ.get("PORT", "5000"))
 MESSAGE_WORKERS = int(os.environ.get("MESSAGE_WORKERS", "2"))
-FEISHU_REPLY_STYLE = os.environ.get("FEISHU_REPLY_STYLE", "text").strip().lower()
-
-# 家庭成员名称映射
-FAMILY_MEMBER_NAME_MAP = _load_json_env("FAMILY_MEMBER_NAME_MAP", {
-    "派小星": "哥哥",
-    "杨": "妈妈",
-    "张哥": "老爸",
-    "乔英子": "妹妹",
-})
+FEISHU_REPLY_STYLE = os.environ.get("FEISHU_REPLY_STYLE", "card").strip().lower()

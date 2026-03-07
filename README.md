@@ -6,14 +6,13 @@
 
 - 多模型分组 & 自动降级：按优先级自动切换，单个模型失败自动尝试下一个
 - 默认 GPT 分组：开箱即用支持 `gpt-5.4,gpt-5.3,gpt-5.2`
-- 聊天内切换模型：通过 `/model` 指令在飞书中选择模型分组
+- 聊天内切换模型：通过 `/model` 指令快速查看当前分组配置并切换
 - 图片识别：发送图片给 Bot，AI 自动识别并回复（需模型支持 vision）
 - 多轮对话：基于 sender + chat 维度保留最近 10 轮上下文（30 分钟过期）
-- 文本回复优化：默认使用更自然的普通文本消息，减少飞书卡片 markdown 显示问题
+- 回复样式可切换：默认使用卡片消息渲染正式回复，也可切换为普通文本消息
 - 群聊 @触发：群聊中仅响应 @机器人 的消息，私聊自动回复
 - 消息去重：TTL 缓存防止重复处理（5 分钟窗口）
 - Token 缓存：飞书 tenant_access_token 自动缓存 & 提前刷新
-- 家庭成员名称映射：可按名称识别家人身份并注入到上下文
 
 ## 💬 聊天指令
 
@@ -60,13 +59,12 @@
 | `AI_BASE_CN` | 国内模型分组 API 地址（不填则用全局） | ❌ |
 | `AI_KEY_GEMINI` | Gemini 分组 API Key | 至少填一组 |
 | `AI_BASE_GEMINI` | Gemini 分组 API 地址（不填则用全局） | ❌ |
-| `AI_MAX_TOKENS` | 最大输出 token 数（默认 4096） | ❌ |
+| `AI_MAX_TOKENS` | 最大输出 token 数（默认 2048） | ❌ |
 | `AI_MODELS_CODEX` | GPT 分组模型列表（默认 `gpt-5.4,gpt-5.3,gpt-5.2`） | ❌ |
-| `AI_MODELS_GEMINI` | Gemini 分组模型列表（默认 `gemini-3-flash-preview,gemini-3.1-pro-preview`） | ❌ |
+| `AI_MODELS_GEMINI` | Gemini 分组模型列表（默认 `gemini-3.1-pro-preview,gemini-3-pro`） | ❌ |
 | `SYSTEM_PROMPT` | 自定义机器人人设提示词 | ❌ |
 | `MESSAGE_WORKERS` | 后台消息处理线程数（默认 `2`） | ❌ |
-| `FEISHU_REPLY_STYLE` | 回复样式，默认 `text`，可选 `card` | ❌ |
-| `FAMILY_MEMBER_NAME_MAP` | 家庭成员名称映射 JSON | ❌ |
+| `FEISHU_REPLY_STYLE` | 回复样式，默认 `card`，可选 `text` | ❌ |
 
 ### 4. 配置飞书 Webhook
 
@@ -97,7 +95,7 @@
 AI_MODELS_CLAUDE="claude-sonnet-4-5-20250929,claude-haiku-4-5"
 AI_MODELS_CODEX="gpt-5.4,gpt-5.3,gpt-5.2"
 AI_MODELS_CN="glm-5,kimi-k2.5"
-AI_MODELS_GEMINI="gemini-3-flash-preview,gemini-3.1-pro-preview"
+AI_MODELS_GEMINI="gemini-3.1-pro-preview,gemini-3-pro"
 ```
 
 分组按 `config.py` 中 `AI_GROUPS` 的顺序依次尝试，没有配置 Key 的分组会自动跳过。用户也可以在飞书中通过 `/model 分组名` 指令手动切换。
@@ -106,32 +104,18 @@ AI_MODELS_GEMINI="gemini-3-flash-preview,gemini-3.1-pro-preview"
 
 设置环境变量 `SYSTEM_PROMPT` 即可自定义机器人性格和能力，默认人设为家庭助手。
 
-### 配置家庭成员名称映射
-
-如果你希望机器人按家庭成员名称识别发言人，可以设置：
-
-```bash
-FAMILY_MEMBER_NAME_MAP='{"派小星":"哥哥","杨":"妈妈","张哥":"老爸","乔英子":"妹妹"}'
-```
-
-说明：
-
-- 这是基于名称的轻量识别，不如 `open_id` 绑定稳定
-- 适合固定家庭群、低频使用场景
-- 如果飞书返回的名称与群里显示名称不一致，可能识别不到
-
 ### 推荐的 Render 免费实例配置
 
 ```bash
 MESSAGE_WORKERS=2
-FEISHU_REPLY_STYLE=text
-AI_MAX_TOKENS=4096
+FEISHU_REPLY_STYLE=card
+AI_MAX_TOKENS=2048
 ```
 
 说明：
 
 - `MESSAGE_WORKERS=2` 更适合 Render 免费实例的 `0.1 CPU / 512 MB`
-- `FEISHU_REPLY_STYLE=text` 可以避免飞书卡片 markdown 显示不稳定的问题
+- `FEISHU_REPLY_STYLE=card` 更适合需要结构化排版的正式回复
 
 ## ❓ 常见问题
 
@@ -142,7 +126,6 @@ AI_MAX_TOKENS=4096
 | 群聊不回复 | 确认消息中 @了机器人，检查日志中 BOT_OPEN_ID 是否正确获取 |
 | 图片识别不工作 | 确认已添加 `im:message:resource` 权限，且使用的模型支持 vision |
 | Render 访问变慢 | 很可能是免费实例休眠后的冷启动，确认是否已配置 14 分钟保活访问 `/health` |
-| 家庭成员识别不生效 | 检查 `FAMILY_MEMBER_NAME_MAP` 是否正确，确认飞书返回的名称是否与映射一致 |
 
 ## 📄 License
 

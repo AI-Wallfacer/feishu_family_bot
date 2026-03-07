@@ -31,3 +31,13 @@ services:
         sync: false
       - key: AI_BASE_GEMINI
         sync: false
+      - key: AI_MAX_TOKENS
+        sync: false
+      - key: AI_MODELS_CODEX
+        sync: false
+      - key: AI_MODELS_GEMINI
+        sync: false
+      - key: MESSAGE_WORKERS
+        sync: false
+      - key: FEISHU_REPLY_STYLE
+        sync: false
