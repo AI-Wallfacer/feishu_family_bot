@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% set current_page = "triggers" %}
+{% block title %}???? - ????{% endblock %}
+{% block page_title %}??????{% endblock %}
+{% block page_desc %}?????????????????{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-hd">
+    <h2>????</h2>
+    <div class="toolbar">
+      <span class="badge">?????</span>
+      <span class="badge">?????</span>
+    </div>
+  </div>
+  <div class="card-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+            <th>???</th>
+            <th>????</th>
+            <th>??</th>
+            <th>??</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in triggers %}
+          <tr>
+            <td>{{ item.sort_order }}</td>
+            <td><strong>{{ item.name }}</strong></td>
+            <td><span class="pill">{{ item.match_mode }}</span></td>
+            <td class="helper">{{ item.keyword|default('') or '???' }}</td>
+            <td>{{ item.reply_text }}</td>
+            <td>{% if item.enabled %}<span class="pill">??</span>{% else %}<span class="pill">??</span>{% endif %}</td>
+            <td>
+              <div class="actions">
+                <a class="btn ghost" href="{{ url_for('admin_triggers', edit=item.id) }}">??</a>
+                <form method="post" action="{{ url_for('admin_trigger_preview', trigger_id=item.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn success" type="submit">??</button>
+                </form>
+                <form method="post" action="{{ url_for('admin_trigger_delete', trigger_id=item.id) }}" onsubmit="return confirm('???????????');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn danger" type="submit">??</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7"><div class="empty">?????????????????????????????</div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <h2>{% if edit_trigger %}????{% else %}????{% endif %}</h2>
+    <span class="badge">???????</span>
+  </div>
+  <div class="card-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_triggers')) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-grid">
+        <div class="field half">
+          <label for="name">????</label>
+          <input id="name" name="name" value="{{ edit_trigger.name|default('') }}" required>
+        </div>
+        <div class="field half">
+          <label for="sort_order">??</label>
+          <input id="sort_order" name="sort_order" type="number" value="{{ edit_trigger.sort_order|default(0) }}">
+        </div>
+        <div class="field third">
+          <label for="match_mode">????</label>
+          <select id="match_mode" name="match_mode">
+            {% for value in ['keyword', 'all'] %}
+            <option value="{{ value }}" {% if edit_trigger.match_mode|default('keyword') == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field third">
+          <label for="keyword">???</label>
+          <input id="keyword" name="keyword" value="{{ edit_trigger.keyword|default('') }}" placeholder="??????">
+        </div>
+        <div class="field third">
+          <label>????</label>
+          <div class="helper">??????????????????????????</div>
+        </div>
+        <div class="field">
+          <label for="reply_text">????</label>
+          <textarea id="reply_text" name="reply_text" required>{{ edit_trigger.reply_text|default('') }}</textarea>
+        </div>
+      </div>
+      <label class="pill" style="width: fit-content;">
+        <input type="checkbox" name="enabled" value="1" {% if edit_trigger.enabled is not defined or edit_trigger.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+        ?????
+      </label>
+      <div class="actions">
+        <button class="btn primary" type="submit">??</button>
+        <a class="btn ghost" href="{{ url_for('admin_triggers') }}">????</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

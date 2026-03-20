@@ -1,0 +1,167 @@
+﻿{% extends "base.html" %}
+{% set current_page = "groups" %}
+{% block title %}AI 分组 - 管理后台{% endblock %}
+{% block page_title %}AI 分组管理{% endblock %}
+{% block page_desc %}编辑分组、模型列表、API 地址和密钥，并刷新远端可用模型。{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-hd">
+    <h2>当前分组</h2>
+    <div class="toolbar">
+      <span class="badge">支持模型发现</span>
+      <span class="badge">支持启停和排序</span>
+    </div>
+  </div>
+  <div class="card-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>顺序</th>
+            <th>名称</th>
+            <th>状态</th>
+            <th>Base URL</th>
+            <th>API Key</th>
+            <th>模型</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in groups %}
+          <tr>
+            <td>{{ group.sort_order }}</td>
+            <td>
+              <strong>{{ group.name }}</strong><br>
+              <span class="helper">最近刷新：{{ group.last_model_refresh_at|default('未刷新') or '未刷新' }}</span>
+            </td>
+            <td>{% if group.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+            <td class="helper">{{ group.base_url|default('未设置') or '未设置' }}</td>
+            <td class="helper">{{ group.api_key_masked|default('未设置') or '未设置' }}</td>
+            <td class="helper">{{ group.models_display|default('未配置') or '未配置' }}</td>
+            <td>
+              <div class="actions">
+                <a class="btn ghost" href="{{ url_for('admin_groups', edit=group.id) }}">编辑</a>
+                <form method="post" action="{{ url_for('admin_group_test', group_id=group.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn ghost">测试连通</button>
+                </form>
+                <form method="post" action="{{ url_for('admin_group_refresh_models', group_id=group.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn success">刷新模型</button>
+                </form>
+                <form method="post" action="{{ url_for('admin_group_delete', group_id=group.id) }}" onsubmit="return confirm('确认删除这个分组吗？');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn danger">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7"><div class="empty">当前还没有分组，请先新增一条。</div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="grid">
+  <section class="card col-6">
+    <div class="card-hd">
+      <h3>{% if edit_group %}编辑分组{% else %}新增分组{% endif %}</h3>
+      <span class="badge">API Key 留空则保留原值</span>
+    </div>
+    <div class="card-bd">
+      <form method="post" action="{{ form_action|default(url_for('admin_groups')) }}" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-grid">
+          <div class="field half">
+            <label for="name">分组名称</label>
+            <input id="name" name="name" value="{{ edit_group.name|default('') }}" required>
+          </div>
+          <div class="field half">
+            <label for="sort_order">排序</label>
+            <input id="sort_order" name="sort_order" type="number" value="{{ edit_group.sort_order|default(0) }}">
+          </div>
+          <div class="field half">
+            <label for="base_url">Base URL</label>
+            <input id="base_url" name="base_url" value="{{ edit_group.base_url|default('') }}" placeholder="https://api.example.com">
+          </div>
+          <div class="field half">
+            <label for="api_key">API Key</label>
+            <input id="api_key" name="api_key" value="" placeholder="留空表示不修改">
+          </div>
+          <div class="field">
+            <label for="models">模型列表</label>
+            <textarea id="models" name="models" placeholder="gpt-5.4,gpt-5.3">{{ edit_group.models|default('') }}</textarea>
+          </div>
+        </div>
+        <label class="pill" style="width: fit-content;">
+          <input type="checkbox" name="enabled" value="1" {% if edit_group.enabled is not defined or edit_group.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+          启用此分组
+        </label>
+        <div class="actions">
+          <button class="btn primary" type="submit">保存</button>
+          <a class="btn ghost" href="{{ url_for('admin_groups') }}">清空编辑</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="card col-6">
+    <div class="card-hd">
+      <h3>模型发现说明</h3>
+      <span class="badge">GET /v1/models</span>
+    </div>
+    <div class="card-bd stack">
+      <div class="helper">点击“刷新模型”时，后台会从当前分组的模型接口拉取远端模型列表。若接口失败，页面仍保留手工输入的模型列表。</div>
+      <div class="helper">点击“测试连通”会访问一次 `/v1/models`，但不会改写现有配置。</div>
+    </div>
+  </section>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <h3>备份与恢复</h3>
+    <span class="badge">适合 Render Free</span>
+  </div>
+  <div class="card-bd">
+    <div class="grid">
+      <section class="card col-6">
+        <div class="card-hd">
+          <h3>导出备份</h3>
+          <span class="badge">JSON</span>
+        </div>
+        <div class="card-bd stack">
+          <div class="helper">导出当前后台配置，包含 AI 分组、触发规则、定时任务和长期记忆。导出的 JSON 会包含 API Key 明文，请只保存在你自己可控的位置。</div>
+          <div class="actions">
+            <a class="btn primary" href="{{ url_for('admin_config_export') }}">下载备份</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="card col-6">
+        <div class="card-hd">
+          <h3>导入恢复</h3>
+          <span class="badge">全量覆盖</span>
+        </div>
+        <div class="card-bd">
+          <form method="post" action="{{ url_for('admin_config_import') }}" enctype="multipart/form-data" class="stack">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="field">
+              <label for="backup_file">选择备份文件</label>
+              <input id="backup_file" name="backup_file" type="file" accept="application/json,.json" required>
+            </div>
+            <div class="helper">导入会清空当前后台中的分组、触发规则、定时任务和长期记忆，然后用备份内容恢复。适合在 Render Free 出现重启或手动 redeploy 后快速恢复。</div>
+            <div class="actions">
+              <button class="btn danger" type="submit" onclick="return confirm('确认用备份覆盖当前后台配置吗？');">导入并覆盖</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+</section>
+{% endblock %}

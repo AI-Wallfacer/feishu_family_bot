@@ -4,6 +4,7 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn bot:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.0"
@@ -12,6 +13,14 @@ services:
       - key: FEISHU_APP_SECRET
         sync: false
       - key: FEISHU_VERIFICATION_TOKEN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: SETTINGS_ENCRYPTION_KEY
+        sync: false
+      - key: BOT_DB_PATH
         sync: false
       - key: AI_API_BASE
         sync: false
@@ -37,7 +46,11 @@ services:
         sync: false
       - key: AI_MODELS_GEMINI
         sync: false
-      - key: MESSAGE_WORKERS
+      - key: QUEUE_MAX_PENDING
         sync: false
-      - key: FEISHU_REPLY_STYLE
+      - key: QUEUE_STALE_SECONDS
+        sync: false
+      - key: BOT_TIMEZONE
+        sync: false
+      - key: SCHEDULER_POLL_SECONDS
         sync: false

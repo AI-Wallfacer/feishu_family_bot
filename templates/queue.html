@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set current_page = "queue" %}
+{% block title %}?? - ????{% endblock %}
+{% block page_title %}??????{% endblock %}
+{% block page_desc %}???????????????????{% endblock %}
+{% block content %}
+<section class="grid">
+  <div class="card col-4">
+    <div class="card-hd">
+      <h2>????</h2>
+      <span class="badge">????</span>
+    </div>
+    <div class="card-bd stack">
+      <div class="pill">????{{ queue_stats.pending|default(0) }}</div>
+      <div class="pill">????{{ queue_stats.processing|default(0) }}</div>
+      <div class="pill">????{{ queue_stats.done|default(0) }}</div>
+      <div class="pill">??/???{{ queue_stats.failed|default(0) }}</div>
+    </div>
+  </div>
+
+  <div class="card col-8">
+    <div class="card-hd">
+      <h2>????</h2>
+      <span class="badge">????????</span>
+    </div>
+    <div class="card-bd">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>??</th>
+              <th>??</th>
+              <th>??</th>
+              <th>??</th>
+              <th>????</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in queue_items %}
+            <tr>
+              <td>#{{ item.position }}</td>
+              <td>{{ item.user_id }}</td>
+              <td>{{ item.chat_id }}</td>
+              <td><span class="pill">{{ item.status }}</span></td>
+              <td class="helper">{{ item.wait_seconds|default(0) }}s</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5"><div class="empty">?????????</div></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <h2>??????</h2>
+    <span class="badge">????</span>
+  </div>
+  <div class="card-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in recent_items %}
+          <tr>
+            <td class="helper">{{ item.created_at|default('') }}</td>
+            <td>{{ item.user_id }}</td>
+            <td><span class="pill">{{ item.result }}</span></td>
+            <td>{{ item.message|default('') }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4"><div class="empty">???????</div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

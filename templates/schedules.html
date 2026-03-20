@@ -1,0 +1,115 @@
+﻿{% extends "base.html" %}
+{% set current_page = "schedules" %}
+{% block title %}定时消息 - 管理后台{% endblock %}
+{% block page_title %}定时消息管理{% endblock %}
+{% block page_desc %}配置一次性、每天或每周发送的任务。{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-hd">
+    <h2>任务列表</h2>
+    <span class="badge">进程内 scheduler</span>
+  </div>
+  <div class="card-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>目标</th>
+            <th>规则</th>
+            <th>内容</th>
+            <th>状态</th>
+            <th>下次执行</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in schedules %}
+          <tr>
+            <td><strong>{{ item.name }}</strong></td>
+            <td>{{ item.target_name|default(item.target_id) }}</td>
+            <td><span class="pill">{{ item.schedule_type }}</span> {{ item.schedule_expr }}</td>
+            <td>{{ item.message }}</td>
+            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+            <td class="helper">{{ item.next_run_at|default('') }}</td>
+            <td>
+              <div class="actions">
+                <a class="btn ghost" href="{{ url_for('admin_schedules', edit=item.id) }}">编辑</a>
+                <form method="post" action="{{ url_for('admin_schedule_run_once', schedule_id=item.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn success" type="submit">试发</button>
+                </form>
+                <form method="post" action="{{ url_for('admin_schedule_delete', schedule_id=item.id) }}" onsubmit="return confirm('确认删除这个定时任务吗？');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn danger" type="submit">删除</button>
+                </form>
+              </div>
+              {% if item.last_error %}
+              <div class="helper" style="margin-top: 8px;">最近错误：{{ item.last_error }}</div>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="empty">暂无定时任务，可以先创建一个一次性提醒试试。</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <h2>{% if edit_schedule %}编辑任务{% else %}新增任务{% endif %}</h2>
+    <span class="badge">一次性 / 每天 / 每周</span>
+  </div>
+  <div class="card-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_schedules')) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-grid">
+        <div class="field half">
+          <label for="name">任务名称</label>
+          <input id="name" name="name" value="{{ edit_schedule.name|default('') }}" required>
+        </div>
+        <div class="field half">
+          <label for="target_id">目标</label>
+          <input id="target_id" name="target_id" value="{{ edit_schedule.target_id|default('') }}" required>
+        </div>
+        <div class="field third">
+          <label for="schedule_type">类型</label>
+          <select id="schedule_type" name="schedule_type">
+            {% for value in ['once', 'daily', 'weekly'] %}
+            <option value="{{ value }}" {% if edit_schedule.schedule_type|default('once') == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field third">
+          <label for="schedule_expr">执行表达式</label>
+          <input id="schedule_expr" name="schedule_expr" value="{{ edit_schedule.schedule_expr|default('') }}" placeholder="如 2026-03-20 21:00、09:30、1 09:30">
+        </div>
+        <div class="field third">
+          <label for="timezone">时区</label>
+          <input id="timezone" name="timezone" value="{{ edit_schedule.timezone|default('Asia/Shanghai') }}">
+        </div>
+        <div class="field">
+          <label for="message">发送内容</label>
+          <textarea id="message" name="message" required>{{ edit_schedule.message|default('') }}</textarea>
+        </div>
+      </div>
+      <div class="helper">一次性：`2026-03-20 21:00` 或 `2026-03-20T21:00`；每天：`09:30`；每周：`1 09:30`，其中 `0` 表示周一，`6` 表示周日。</div>
+      <label class="pill" style="width: fit-content;">
+        <input type="checkbox" name="enabled" value="1" {% if edit_schedule.enabled is not defined or edit_schedule.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+        启用此任务
+      </label>
+      <div class="actions">
+        <button class="btn primary" type="submit">保存</button>
+        <a class="btn ghost" href="{{ url_for('admin_schedules') }}">清空编辑</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

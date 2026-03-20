@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% set current_page = "memory" %}
+{% block title %}???? - ????{% endblock %}
+{% block page_title %}??????{% endblock %}
+{% block page_desc %}?????????????????????????{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-hd">
+    <h2>????</h2>
+    <div class="toolbar">
+      <span class="badge">?????</span>
+      <form method="get" action="{{ url_for('admin_memory') }}" class="actions">
+        <input type="text" name="q" value="{{ search_query|default('') }}" placeholder="??????????">
+        <button type="submit" class="btn ghost">??</button>
+      </form>
+    </div>
+  </div>
+  <div class="card-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+            <th>??</th>
+            <th>????</th>
+            <th>??</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in memories %}
+          <tr>
+            <td>{{ item.user_id }}</td>
+            <td>{{ item.chat_id }}</td>
+            <td><span class="pill">{{ item.memory_type }}</span></td>
+            <td>{{ item.content }}</td>
+            <td>{% if item.enabled %}<span class="pill">??</span>{% else %}<span class="pill">??</span>{% endif %}</td>
+            <td class="helper">{{ item.updated_at|default('') }}</td>
+            <td>
+              <div class="actions">
+                <a class="btn ghost" href="{{ url_for('admin_memory', edit=item.id) }}">??</a>
+                <form method="post" action="{{ url_for('admin_memory_delete', memory_id=item.id) }}" onsubmit="return confirm('?????????');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn danger" type="submit">??</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7"><div class="empty">????????????????????</div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-hd">
+    <h2>{% if edit_memory %}????{% else %}????{% endif %}</h2>
+    <span class="badge">?????</span>
+  </div>
+  <div class="card-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_memory')) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-grid">
+        <div class="field third">
+          <label for="user_id">?? ID</label>
+          <input id="user_id" name="user_id" value="{{ edit_memory.user_id|default('') }}" {% if edit_memory %}readonly{% else %}required{% endif %}>
+        </div>
+        <div class="field third">
+          <label for="chat_id">?? ID</label>
+          <input id="chat_id" name="chat_id" value="{{ edit_memory.chat_id|default('') }}" {% if edit_memory %}readonly{% else %}required{% endif %}>
+        </div>
+        <div class="field third">
+          <label for="memory_type">??</label>
+          <select id="memory_type" name="memory_type">
+            {% for value in ['profile', 'preference', 'relationship', 'reminder_hint'] %}
+            <option value="{{ value }}" {% if edit_memory.memory_type|default('profile') == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="content">??</label>
+          <textarea id="content" name="content" required>{{ edit_memory.content|default('') }}</textarea>
+        </div>
+      </div>
+      <label class="pill" style="width: fit-content;">
+        <input type="checkbox" name="enabled" value="1" {% if edit_memory.enabled is not defined or edit_memory.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+        ?????
+      </label>
+      <div class="actions">
+        <button class="btn primary" type="submit">??</button>
+        <a class="btn ghost" href="{{ url_for('admin_memory') }}">????</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

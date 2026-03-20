@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set current_page = "login" %}
+{% block title %}?? - ????{% endblock %}
+{% block shell %}
+<main class="page">
+  <section class="hero">
+    <div>
+      <h1>??????</h1>
+      <p>???????????????? AI ??????????????????</p>
+    </div>
+    <div class="meta">
+      <div class="pill">??????? + CSRF</div>
+      <div class="pill">???SQLite</div>
+    </div>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <section class="flash-list">
+    {% for category, message in messages %}
+    <div class="flash {{ category|default('info') }}">{{ message }}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% endwith %}
+
+  <section class="card" style="max-width: 560px; margin: 0 auto;">
+    <div class="card-hd">
+      <h2>?????</h2>
+      <span class="badge">??????</span>
+    </div>
+    <div class="card-bd">
+      <form method="post" action="{{ url_for('admin_login') }}" class="stack">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field">
+          <label for="password">?????</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit">??</button>
+        </div>
+        <div class="helper">??????? `ADMIN_PASSWORD` ????????</div>
+      </form>
+    </div>
+  </section>
+</main>
+{% endblock %}
