@@ -1,38 +1,38 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "queue" %}
-{% block title %}?? - ????{% endblock %}
-{% block page_title %}??????{% endblock %}
-{% block page_desc %}???????????????????{% endblock %}
+{% block title %}队列 - 管理后台{% endblock %}
+{% block page_title %}消息队列概览{% endblock %}
+{% block page_desc %}查看当前排队、处理中和最近完成的消息。{% endblock %}
 {% block content %}
 <section class="grid">
   <div class="card col-4">
     <div class="card-hd">
-      <h2>????</h2>
-      <span class="badge">????</span>
+      <h2>队列统计</h2>
+      <span class="badge">实时状态</span>
     </div>
     <div class="card-bd stack">
-      <div class="pill">????{{ queue_stats.pending|default(0) }}</div>
-      <div class="pill">????{{ queue_stats.processing|default(0) }}</div>
-      <div class="pill">????{{ queue_stats.done|default(0) }}</div>
-      <div class="pill">??/???{{ queue_stats.failed|default(0) }}</div>
+      <div class="pill">等待中：{{ queue_stats.pending|default(0) }}</div>
+      <div class="pill">处理中：{{ queue_stats.processing|default(0) }}</div>
+      <div class="pill">已完成：{{ queue_stats.done|default(0) }}</div>
+      <div class="pill">失败或异常：{{ queue_stats.failed|default(0) }}</div>
     </div>
   </div>
 
   <div class="card col-8">
     <div class="card-hd">
-      <h2>????</h2>
-      <span class="badge">????????</span>
+      <h2>当前等待</h2>
+      <span class="badge">前方还有几条消息</span>
     </div>
     <div class="card-bd">
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>??</th>
-              <th>??</th>
-              <th>??</th>
-              <th>??</th>
-              <th>????</th>
+              <th>位置</th>
+              <th>用户</th>
+              <th>群聊</th>
+              <th>状态</th>
+              <th>排队时间</th>
             </tr>
           </thead>
           <tbody>
@@ -46,7 +46,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="5"><div class="empty">?????????</div></td>
+              <td colspan="5"><div class="empty">当前没有排队消息。</div></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -58,18 +58,18 @@
 
 <section class="card">
   <div class="card-hd">
-    <h2>??????</h2>
-    <span class="badge">????</span>
-  </div>
+    <h2>最近处理记录</h2>
+    <span class="badge">便于排查</span>
+    </div>
   <div class="card-bd">
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
+            <th>时间</th>
+            <th>用户</th>
+            <th>结果</th>
+            <th>说明</th>
           </tr>
         </thead>
         <tbody>
@@ -82,7 +82,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="4"><div class="empty">???????</div></td>
+            <td colspan="4"><div class="empty">暂无处理记录。</div></td>
           </tr>
           {% endfor %}
         </tbody>

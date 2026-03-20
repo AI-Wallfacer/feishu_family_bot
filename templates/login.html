@@ -1,16 +1,16 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "login" %}
-{% block title %}?? - ????{% endblock %}
+{% block title %}登录 - 管理后台{% endblock %}
 {% block shell %}
 <main class="page">
   <section class="hero">
     <div>
-      <h1>??????</h1>
-      <p>???????????????? AI ??????????????????</p>
+      <h1>登录管理后台</h1>
+      <p>使用管理员密码进入控制面板，管理 AI 分组、长期记忆、定时任务和触发规则。</p>
     </div>
     <div class="meta">
-      <div class="pill">??????? + CSRF</div>
-      <div class="pill">???SQLite</div>
+      <div class="pill">安全：会话签名 + CSRF</div>
+      <div class="pill">存储：SQLite</div>
     </div>
   </section>
 
@@ -26,20 +26,20 @@
 
   <section class="card" style="max-width: 560px; margin: 0 auto;">
     <div class="card-hd">
-      <h2>?????</h2>
-      <span class="badge">??????</span>
+      <h2>管理员登录</h2>
+      <span class="badge">仅限授权用户</span>
     </div>
     <div class="card-bd">
       <form method="post" action="{{ url_for('admin_login') }}" class="stack">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="field">
-          <label for="password">?????</label>
+          <label for="password">管理员密码</label>
           <input id="password" name="password" type="password" autocomplete="current-password" required>
         </div>
         <div class="actions">
-          <button class="btn primary" type="submit">??</button>
+          <button class="btn primary" type="submit">登录</button>
         </div>
-        <div class="helper">??????? `ADMIN_PASSWORD` ????????</div>
+        <div class="helper">请输入环境变量 `ADMIN_PASSWORD` 对应的密码。</div>
       </form>
     </div>
   </section>

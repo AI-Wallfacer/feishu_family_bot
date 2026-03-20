@@ -1,17 +1,17 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "memory" %}
-{% block title %}???? - ????{% endblock %}
-{% block page_title %}??????{% endblock %}
-{% block page_desc %}?????????????????????????{% endblock %}
+{% block title %}长期记忆 - 管理后台{% endblock %}
+{% block page_title %}长期记忆管理{% endblock %}
+{% block page_desc %}查看、搜索、编辑和清理结构化记忆。私聊不会写入长期记忆。{% endblock %}
 {% block content %}
 <section class="card">
   <div class="card-hd">
-    <h2>????</h2>
+    <h2>记忆列表</h2>
     <div class="toolbar">
-      <span class="badge">?????</span>
+      <span class="badge">仅群聊启用</span>
       <form method="get" action="{{ url_for('admin_memory') }}" class="actions">
-        <input type="text" name="q" value="{{ search_query|default('') }}" placeholder="??????????">
-        <button type="submit" class="btn ghost">??</button>
+        <input type="text" name="q" value="{{ search_query|default('') }}" placeholder="搜索用户、群聊或内容">
+        <button type="submit" class="btn ghost">搜索</button>
       </form>
     </div>
   </div>
@@ -20,13 +20,13 @@
       <table>
         <thead>
           <tr>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
-            <th>????</th>
-            <th>??</th>
+            <th>用户</th>
+            <th>群聊</th>
+            <th>类型</th>
+            <th>内容</th>
+            <th>状态</th>
+            <th>更新时间</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -36,21 +36,21 @@
             <td>{{ item.chat_id }}</td>
             <td><span class="pill">{{ item.memory_type }}</span></td>
             <td>{{ item.content }}</td>
-            <td>{% if item.enabled %}<span class="pill">??</span>{% else %}<span class="pill">??</span>{% endif %}</td>
+            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
             <td class="helper">{{ item.updated_at|default('') }}</td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_memory', edit=item.id) }}">??</a>
-                <form method="post" action="{{ url_for('admin_memory_delete', memory_id=item.id) }}" onsubmit="return confirm('?????????');">
+                <a class="btn ghost" href="{{ url_for('admin_memory', edit=item.id) }}">编辑</a>
+                <form method="post" action="{{ url_for('admin_memory_delete', memory_id=item.id) }}" onsubmit="return confirm('确认删除这条长期记忆吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn danger" type="submit">??</button>
+                  <button class="btn danger" type="submit">删除</button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7"><div class="empty">????????????????????</div></td>
+            <td colspan="7"><div class="empty">当前还没有长期记忆。群聊中命中提炼规则后，这里会逐渐累积内容。</div></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -61,23 +61,23 @@
 
 <section class="card">
   <div class="card-hd">
-    <h2>{% if edit_memory %}????{% else %}????{% endif %}</h2>
-    <span class="badge">?????</span>
+    <h2>{% if edit_memory %}编辑记忆{% else %}新增记忆{% endif %}</h2>
+    <span class="badge">结构化事实</span>
   </div>
   <div class="card-bd">
     <form method="post" action="{{ form_action|default(url_for('admin_memory')) }}" class="stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field third">
-          <label for="user_id">?? ID</label>
+          <label for="user_id">用户 ID</label>
           <input id="user_id" name="user_id" value="{{ edit_memory.user_id|default('') }}" {% if edit_memory %}readonly{% else %}required{% endif %}>
         </div>
         <div class="field third">
-          <label for="chat_id">?? ID</label>
+          <label for="chat_id">群聊 ID</label>
           <input id="chat_id" name="chat_id" value="{{ edit_memory.chat_id|default('') }}" {% if edit_memory %}readonly{% else %}required{% endif %}>
         </div>
         <div class="field third">
-          <label for="memory_type">??</label>
+          <label for="memory_type">类型</label>
           <select id="memory_type" name="memory_type">
             {% for value in ['profile', 'preference', 'relationship', 'reminder_hint'] %}
             <option value="{{ value }}" {% if edit_memory.memory_type|default('profile') == value %}selected{% endif %}>{{ value }}</option>
@@ -85,17 +85,17 @@
           </select>
         </div>
         <div class="field">
-          <label for="content">??</label>
+          <label for="content">内容</label>
           <textarea id="content" name="content" required>{{ edit_memory.content|default('') }}</textarea>
         </div>
       </div>
       <label class="pill" style="width: fit-content;">
         <input type="checkbox" name="enabled" value="1" {% if edit_memory.enabled is not defined or edit_memory.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
-        ?????
+        启用此记忆
       </label>
       <div class="actions">
-        <button class="btn primary" type="submit">??</button>
-        <a class="btn ghost" href="{{ url_for('admin_memory') }}">????</a>
+        <button class="btn primary" type="submit">保存</button>
+        <a class="btn ghost" href="{{ url_for('admin_memory') }}">清空编辑</a>
       </div>
     </form>
   </div>

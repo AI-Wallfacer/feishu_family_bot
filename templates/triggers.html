@@ -1,15 +1,15 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "triggers" %}
-{% block title %}???? - ????{% endblock %}
-{% block page_title %}??????{% endblock %}
-{% block page_desc %}?????????????????{% endblock %}
+{% block title %}触发规则 - 管理后台{% endblock %}
+{% block page_title %}触发规则管理{% endblock %}
+{% block page_desc %}为关键词命中或全触发配置固定回复。{% endblock %}
 {% block content %}
 <section class="card">
   <div class="card-hd">
-    <h2>????</h2>
+    <h2>规则列表</h2>
     <div class="toolbar">
-      <span class="badge">?????</span>
-      <span class="badge">?????</span>
+      <span class="badge">关键词优先</span>
+      <span class="badge">同一消息只执行一条</span>
     </div>
   </div>
   <div class="card-bd">
@@ -17,13 +17,13 @@
       <table>
         <thead>
           <tr>
-            <th>??</th>
-            <th>??</th>
-            <th>??</th>
-            <th>???</th>
-            <th>????</th>
-            <th>??</th>
-            <th>??</th>
+            <th>顺序</th>
+            <th>名称</th>
+            <th>模式</th>
+            <th>关键词</th>
+            <th>回复内容</th>
+            <th>状态</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -32,26 +32,26 @@
             <td>{{ item.sort_order }}</td>
             <td><strong>{{ item.name }}</strong></td>
             <td><span class="pill">{{ item.match_mode }}</span></td>
-            <td class="helper">{{ item.keyword|default('') or '???' }}</td>
+            <td class="helper">{{ item.keyword|default('') or '全触发' }}</td>
             <td>{{ item.reply_text }}</td>
-            <td>{% if item.enabled %}<span class="pill">??</span>{% else %}<span class="pill">??</span>{% endif %}</td>
+            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_triggers', edit=item.id) }}">??</a>
+                <a class="btn ghost" href="{{ url_for('admin_triggers', edit=item.id) }}">编辑</a>
                 <form method="post" action="{{ url_for('admin_trigger_preview', trigger_id=item.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn success" type="submit">??</button>
+                  <button class="btn success" type="submit">预览</button>
                 </form>
-                <form method="post" action="{{ url_for('admin_trigger_delete', trigger_id=item.id) }}" onsubmit="return confirm('???????????');">
+                <form method="post" action="{{ url_for('admin_trigger_delete', trigger_id=item.id) }}" onsubmit="return confirm('确认删除这条触发规则吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn danger" type="submit">??</button>
+                  <button class="btn danger" type="submit">删除</button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7"><div class="empty">?????????????????????????????</div></td>
+            <td colspan="7"><div class="empty">还没有触发规则。你可以先添加一个关键词规则，或者设置一个全触发兜底规则。</div></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -62,23 +62,23 @@
 
 <section class="card">
   <div class="card-hd">
-    <h2>{% if edit_trigger %}????{% else %}????{% endif %}</h2>
-    <span class="badge">???????</span>
+    <h2>{% if edit_trigger %}编辑规则{% else %}新增规则{% endif %}</h2>
+    <span class="badge">固定回复</span>
   </div>
   <div class="card-bd">
     <form method="post" action="{{ form_action|default(url_for('admin_triggers')) }}" class="stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field half">
-          <label for="name">????</label>
+          <label for="name">规则名称</label>
           <input id="name" name="name" value="{{ edit_trigger.name|default('') }}" required>
         </div>
         <div class="field half">
-          <label for="sort_order">??</label>
+          <label for="sort_order">排序</label>
           <input id="sort_order" name="sort_order" type="number" value="{{ edit_trigger.sort_order|default(0) }}">
         </div>
         <div class="field third">
-          <label for="match_mode">????</label>
+          <label for="match_mode">匹配模式</label>
           <select id="match_mode" name="match_mode">
             {% for value in ['keyword', 'all'] %}
             <option value="{{ value }}" {% if edit_trigger.match_mode|default('keyword') == value %}selected{% endif %}>{{ value }}</option>
@@ -86,25 +86,25 @@
           </select>
         </div>
         <div class="field third">
-          <label for="keyword">???</label>
-          <input id="keyword" name="keyword" value="{{ edit_trigger.keyword|default('') }}" placeholder="??????">
+          <label for="keyword">关键词</label>
+          <input id="keyword" name="keyword" value="{{ edit_trigger.keyword|default('') }}" placeholder="全触发模式可留空">
         </div>
         <div class="field third">
-          <label>????</label>
-          <div class="helper">??????????????????????????</div>
+          <label>匹配说明</label>
+          <div class="helper">`keyword` 表示命中关键词，`all` 表示在未命中关键词时作为兜底回复。</div>
         </div>
         <div class="field">
-          <label for="reply_text">????</label>
+          <label for="reply_text">回复内容</label>
           <textarea id="reply_text" name="reply_text" required>{{ edit_trigger.reply_text|default('') }}</textarea>
         </div>
       </div>
       <label class="pill" style="width: fit-content;">
         <input type="checkbox" name="enabled" value="1" {% if edit_trigger.enabled is not defined or edit_trigger.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
-        ?????
+        启用此规则
       </label>
       <div class="actions">
-        <button class="btn primary" type="submit">??</button>
-        <a class="btn ghost" href="{{ url_for('admin_triggers') }}">????</a>
+        <button class="btn primary" type="submit">保存</button>
+        <a class="btn ghost" href="{{ url_for('admin_triggers') }}">清空编辑</a>
       </div>
     </form>
   </div>
