@@ -1,18 +1,40 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "groups" %}
 {% block title %}AI 分组 - 管理后台{% endblock %}
 {% block page_title %}AI 分组管理{% endblock %}
-{% block page_desc %}编辑分组、模型列表、API 地址和密钥，并刷新远端可用模型。{% endblock %}
+{% block page_desc %}统一管理模型分组、Base URL、API Key 和模型列表。这里也是 Render Free 方案下最重要的备份入口。{% endblock %}
 {% block content %}
-<section class="card">
-  <div class="card-hd">
-    <h2>当前分组</h2>
+<section class="metric-grid">
+  <article class="metric-card">
+    <p class="metric-label">当前分组数</p>
+    <p class="metric-value">{{ groups|length }}</p>
+    <p class="metric-note">按排序顺序依次尝试，适合多组模型兜底。</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">模型发现</p>
+    <p class="metric-value">/v1/models</p>
+    <p class="metric-note">支持手动填写，也支持在后台一键刷新远端可用模型。</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">部署建议</p>
+    <p class="metric-value">先备份</p>
+    <p class="metric-note">Render Free 每次重启前都建议先导出一次后台 JSON 备份。</p>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>分组列表</h3>
+      <p class="helper">优先级越小越靠前。建议只启用你真正会参与轮询的分组，避免排查时信息过多。</p>
+    </div>
     <div class="toolbar">
-      <span class="badge">支持模型发现</span>
+      <span class="badge">支持测试连通</span>
+      <span class="badge">支持刷新模型</span>
       <span class="badge">支持启停和排序</span>
     </div>
   </div>
-  <div class="card-bd">
+  <div class="panel-bd">
     <div class="table-wrap">
       <table>
         <thead>
@@ -31,34 +53,42 @@
           <tr>
             <td>{{ group.sort_order }}</td>
             <td>
-              <strong>{{ group.name }}</strong><br>
-              <span class="helper">最近刷新：{{ group.last_model_refresh_at|default('未刷新') or '未刷新' }}</span>
+              <div class="table-title">
+                <strong>{{ group.name }}</strong>
+                <span class="helper">最近刷新：{{ group.last_model_refresh_at|default('未刷新') or '未刷新' }}</span>
+              </div>
             </td>
-            <td>{% if group.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+            <td>
+              {% if group.enabled %}
+              <span class="pill">启用</span>
+              {% else %}
+              <span class="pill">停用</span>
+              {% endif %}
+            </td>
             <td class="helper">{{ group.base_url|default('未设置') or '未设置' }}</td>
             <td class="helper">{{ group.api_key_masked|default('未设置') or '未设置' }}</td>
             <td class="helper">{{ group.models_display|default('未配置') or '未配置' }}</td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_groups', edit=group.id) }}">编辑</a>
-                <form method="post" action="{{ url_for('admin_group_test', group_id=group.id) }}">
+                <a class="btn btn-ghost" href="{{ url_for('admin_groups', edit=group.id) }}">编辑</a>
+                <form class="inline-form" method="post" action="{{ url_for('admin_group_test', group_id=group.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button type="submit" class="btn ghost">测试连通</button>
+                  <button class="btn btn-ghost" type="submit">测试连通</button>
                 </form>
-                <form method="post" action="{{ url_for('admin_group_refresh_models', group_id=group.id) }}">
+                <form class="inline-form" method="post" action="{{ url_for('admin_group_refresh_models', group_id=group.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button type="submit" class="btn success">刷新模型</button>
+                  <button class="btn btn-success" type="submit">刷新模型</button>
                 </form>
-                <form method="post" action="{{ url_for('admin_group_delete', group_id=group.id) }}" onsubmit="return confirm('确认删除这个分组吗？');">
+                <form class="inline-form" method="post" action="{{ url_for('admin_group_delete', group_id=group.id) }}" onsubmit="return confirm('确认删除这个分组吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button type="submit" class="btn danger">删除</button>
+                  <button class="btn btn-danger" type="submit">删除</button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7"><div class="empty">当前还没有分组，请先新增一条。</div></td>
+            <td colspan="7"><div class="empty">当前还没有分组。你可以先新增一个分组，把常用模型接进来。</div></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -67,19 +97,22 @@
   </div>
 </section>
 
-<section class="grid">
-  <section class="card col-6">
-    <div class="card-hd">
-      <h3>{% if edit_group %}编辑分组{% else %}新增分组{% endif %}</h3>
+<section class="split-grid">
+  <section class="panel panel-main">
+    <div class="panel-hd">
+      <div>
+        <h3>{% if edit_group %}编辑分组{% else %}新增分组{% endif %}</h3>
+        <p class="helper">表单结构尽量保持清晰稳定。保留现有字段，不改变任何提交流程。</p>
+      </div>
       <span class="badge">API Key 留空则保留原值</span>
     </div>
-    <div class="card-bd">
-      <form method="post" action="{{ form_action|default(url_for('admin_groups')) }}" class="stack">
+    <div class="panel-bd">
+      <form method="post" action="{{ form_action|default(url_for('admin_groups')) }}" class="panel-stack">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-grid">
           <div class="field half">
             <label for="name">分组名称</label>
-            <input id="name" name="name" value="{{ edit_group.name|default('') }}" required>
+            <input id="name" name="name" value="{{ edit_group.name|default('') }}" placeholder="例如：Codex 主路由" required>
           </div>
           <div class="field half">
             <label for="sort_order">排序</label>
@@ -98,68 +131,71 @@
             <textarea id="models" name="models" placeholder="gpt-5.4,gpt-5.3">{{ edit_group.models|default('') }}</textarea>
           </div>
         </div>
-        <label class="pill" style="width: fit-content;">
-          <input type="checkbox" name="enabled" value="1" {% if edit_group.enabled is not defined or edit_group.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+        <label class="checkbox-row">
+          <input type="checkbox" name="enabled" value="1" {% if edit_group.enabled is not defined or edit_group.enabled %}checked{% endif %}>
           启用此分组
         </label>
         <div class="actions">
-          <button class="btn primary" type="submit">保存</button>
-          <a class="btn ghost" href="{{ url_for('admin_groups') }}">清空编辑</a>
+          <button class="btn btn-primary" type="submit">保存分组</button>
+          <a class="btn btn-ghost" href="{{ url_for('admin_groups') }}">清空编辑</a>
         </div>
       </form>
     </div>
   </section>
 
-  <section class="card col-6">
-    <div class="card-hd">
-      <h3>模型发现说明</h3>
-      <span class="badge">GET /v1/models</span>
+  <section class="panel panel-side">
+    <div class="panel-hd">
+      <div>
+        <h3>使用说明</h3>
+        <p class="helper">把最常用、最稳定的分组排在前面，能明显降低回退时的排查成本。</p>
+      </div>
+      <span class="badge">部署提示</span>
     </div>
-    <div class="card-bd stack">
-      <div class="helper">点击“刷新模型”时，后台会从当前分组的模型接口拉取远端模型列表。若接口失败，页面仍保留手工输入的模型列表。</div>
-      <div class="helper">点击“测试连通”会访问一次 `/v1/models`，但不会改写现有配置。</div>
+    <div class="panel-bd panel-stack">
+      <div class="subpanel">
+        <h4>模型发现</h4>
+        <p class="helper">点击“刷新模型”会访问当前分组的 <code>/v1/models</code>。若接口失败，后台仍会保留你手工填写的模型列表。</p>
+      </div>
+      <div class="subpanel">
+        <h4>连接测试</h4>
+        <p class="helper">“测试连通”只做一次接口探测，不会覆盖任何配置。适合排查 key、base URL 和网关兼容性。</p>
+      </div>
+      <div class="subpanel">
+        <h4>小机器建议</h4>
+        <p class="helper">对 512MB / 0.1 CPU 的机器，建议把分组数量控制在真正需要的范围内，避免长期保留太多候选模型。</p>
+      </div>
     </div>
   </section>
 </section>
 
-<section class="card">
-  <div class="card-hd">
-    <h3>备份与恢复</h3>
-    <span class="badge">适合 Render Free</span>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>备份与恢复</h3>
+      <p class="helper">这是 Render Free 方案下最重要的一块。建议每次改大配置前先导出一次。</p>
+    </div>
+    <span class="badge">JSON 快照</span>
   </div>
-  <div class="card-bd">
-    <div class="grid">
-      <section class="card col-6">
-        <div class="card-hd">
-          <h3>导出备份</h3>
-          <span class="badge">JSON</span>
-        </div>
-        <div class="card-bd stack">
-          <div class="helper">导出当前后台配置，包含 AI 分组、触发规则、定时任务和长期记忆。导出的 JSON 会包含 API Key 明文，请只保存在你自己可控的位置。</div>
-          <div class="actions">
-            <a class="btn primary" href="{{ url_for('admin_config_export') }}">下载备份</a>
-          </div>
+  <div class="panel-bd">
+    <div class="subpanel-grid">
+      <section class="subpanel">
+        <h4>导出备份</h4>
+        <p class="helper">导出当前后台配置，包含 AI 分组、触发规则、定时任务和长期记忆。导出的 JSON 会包含 API Key 明文，请只保存在你自己可控的位置。</p>
+        <div class="actions" style="margin-top: 14px;">
+          <a class="btn btn-primary" href="{{ url_for('admin_config_export') }}">下载备份</a>
         </div>
       </section>
-
-      <section class="card col-6">
-        <div class="card-hd">
-          <h3>导入恢复</h3>
-          <span class="badge">全量覆盖</span>
-        </div>
-        <div class="card-bd">
-          <form method="post" action="{{ url_for('admin_config_import') }}" enctype="multipart/form-data" class="stack">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <div class="field">
-              <label for="backup_file">选择备份文件</label>
-              <input id="backup_file" name="backup_file" type="file" accept="application/json,.json" required>
-            </div>
-            <div class="helper">导入会清空当前后台中的分组、触发规则、定时任务和长期记忆，然后用备份内容恢复。适合在 Render Free 出现重启或手动 redeploy 后快速恢复。</div>
-            <div class="actions">
-              <button class="btn danger" type="submit" onclick="return confirm('确认用备份覆盖当前后台配置吗？');">导入并覆盖</button>
-            </div>
-          </form>
-        </div>
+      <section class="subpanel">
+        <h4>导入恢复</h4>
+        <p class="helper">导入会清空当前后台里的分组、触发规则、定时任务和长期记忆，然后用备份内容恢复。适合在 Render Free 重启或 redeploy 后快速回填。</p>
+        <form method="post" action="{{ url_for('admin_config_import') }}" enctype="multipart/form-data" class="panel-stack" style="margin-top: 14px;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="field">
+            <label for="backup_file">选择备份文件</label>
+            <input id="backup_file" name="backup_file" type="file" accept="application/json,.json" required>
+          </div>
+          <button class="btn btn-danger" type="submit" onclick="return confirm('确认用备份覆盖当前后台配置吗？');">导入并覆盖</button>
+        </form>
       </section>
     </div>
   </div>

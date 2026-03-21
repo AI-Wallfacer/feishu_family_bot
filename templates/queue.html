@@ -2,66 +2,80 @@
 {% set current_page = "queue" %}
 {% block title %}队列 - 管理后台{% endblock %}
 {% block page_title %}消息队列概览{% endblock %}
-{% block page_desc %}查看当前排队、处理中和最近完成的消息。{% endblock %}
+{% block page_desc %}查看当前排队、处理中和最近完成的消息。这一页主要用于快速判断服务是不是被堆住了。{% endblock %}
 {% block content %}
-<section class="grid">
-  <div class="card col-4">
-    <div class="card-hd">
-      <h2>队列统计</h2>
-      <span class="badge">实时状态</span>
-    </div>
-    <div class="card-bd stack">
-      <div class="pill">等待中：{{ queue_stats.pending|default(0) }}</div>
-      <div class="pill">处理中：{{ queue_stats.processing|default(0) }}</div>
-      <div class="pill">已完成：{{ queue_stats.done|default(0) }}</div>
-      <div class="pill">失败或异常：{{ queue_stats.failed|default(0) }}</div>
-    </div>
-  </div>
+<section class="metric-grid metric-grid-4">
+  <article class="metric-card">
+    <p class="metric-label">等待中</p>
+    <p class="metric-value">{{ queue_stats.pending|default(0) }}</p>
+    <p class="metric-note">还没轮到处理的消息数。</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">处理中</p>
+    <p class="metric-value">{{ queue_stats.processing|default(0) }}</p>
+    <p class="metric-note">当前正在调用模型的消息。</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">已完成</p>
+    <p class="metric-value">{{ queue_stats.done|default(0) }}</p>
+    <p class="metric-note">最近处理成功的消息记录。</p>
+  </article>
+  <article class="metric-card">
+    <p class="metric-label">失败或异常</p>
+    <p class="metric-value">{{ queue_stats.failed|default(0) }}</p>
+    <p class="metric-note">用于快速发现模型调用或发送链路问题。</p>
+  </article>
+</section>
 
-  <div class="card col-8">
-    <div class="card-hd">
-      <h2>当前等待</h2>
-      <span class="badge">前方还有几条消息</span>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>当前等待</h3>
+      <p class="helper">这里会显示当前正在处理和排队中的消息位置，方便你判断前方是否已经堆积。</p>
     </div>
-    <div class="card-bd">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>位置</th>
-              <th>用户</th>
-              <th>群聊</th>
-              <th>状态</th>
-              <th>排队时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in queue_items %}
-            <tr>
-              <td>#{{ item.position }}</td>
-              <td>{{ item.user_id }}</td>
-              <td>{{ item.chat_id }}</td>
-              <td><span class="pill">{{ item.status }}</span></td>
-              <td class="helper">{{ item.wait_seconds|default(0) }}s</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="5"><div class="empty">当前没有排队消息。</div></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+    <span class="badge">前方还有几条消息</span>
+  </div>
+  <div class="panel-bd">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>位置</th>
+            <th>用户</th>
+            <th>群聊</th>
+            <th>状态</th>
+            <th>排队时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in queue_items %}
+          <tr>
+            <td>#{{ item.position }}</td>
+            <td>{{ item.user_id }}</td>
+            <td>{{ item.chat_id }}</td>
+            <td><span class="pill">{{ item.status }}</span></td>
+            <td class="helper">{{ item.wait_seconds|default(0) }}s</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5"><div class="empty">当前没有排队消息。</div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
 
-<section class="card">
-  <div class="card-hd">
-    <h2>最近处理记录</h2>
-    <span class="badge">便于排查</span>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>最近处理记录</h3>
+      <p class="helper">当用户说“怎么今天没回复”时，这一页会比翻日志更快告诉你最近发生了什么。</p>
     </div>
-  <div class="card-bd">
+    <span class="badge">便于排查</span>
+  </div>
+  <div class="panel-bd">
     <div class="table-wrap">
       <table>
         <thead>

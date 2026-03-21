@@ -2,20 +2,23 @@
 {% set current_page = "memory" %}
 {% block title %}长期记忆 - 管理后台{% endblock %}
 {% block page_title %}长期记忆管理{% endblock %}
-{% block page_desc %}查看、搜索、编辑和清理结构化记忆。私聊不会写入长期记忆。{% endblock %}
+{% block page_desc %}查看、搜索、编辑和清理结构化记忆。私聊不会写入长期记忆，群聊才会参与这一层记忆积累。{% endblock %}
 {% block content %}
-<section class="card">
-  <div class="card-hd">
-    <h2>记忆列表</h2>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>记忆列表</h3>
+      <p class="helper">记忆是结构化事实层，不是聊天日志。建议定期清理过时内容，让注入上下文保持精炼。</p>
+    </div>
     <div class="toolbar">
       <span class="badge">仅群聊启用</span>
-      <form method="get" action="{{ url_for('admin_memory') }}" class="actions">
+      <form class="actions inline-form" method="get" action="{{ url_for('admin_memory') }}">
         <input type="text" name="q" value="{{ search_query|default('') }}" placeholder="搜索用户、群聊或内容">
-        <button type="submit" class="btn ghost">搜索</button>
+        <button class="btn btn-ghost" type="submit">搜索</button>
       </form>
     </div>
   </div>
-  <div class="card-bd">
+  <div class="panel-bd">
     <div class="table-wrap">
       <table>
         <thead>
@@ -36,14 +39,20 @@
             <td>{{ item.chat_id }}</td>
             <td><span class="pill">{{ item.memory_type }}</span></td>
             <td>{{ item.content }}</td>
-            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+            <td>
+              {% if item.enabled %}
+              <span class="pill">启用</span>
+              {% else %}
+              <span class="pill">停用</span>
+              {% endif %}
+            </td>
             <td class="helper">{{ item.updated_at|default('') }}</td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_memory', edit=item.id) }}">编辑</a>
-                <form method="post" action="{{ url_for('admin_memory_delete', memory_id=item.id) }}" onsubmit="return confirm('确认删除这条长期记忆吗？');">
+                <a class="btn btn-ghost" href="{{ url_for('admin_memory', edit=item.id) }}">编辑</a>
+                <form class="inline-form" method="post" action="{{ url_for('admin_memory_delete', memory_id=item.id) }}" onsubmit="return confirm('确认删除这条长期记忆吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn danger" type="submit">删除</button>
+                  <button class="btn btn-danger" type="submit">删除</button>
                 </form>
               </div>
             </td>
@@ -59,13 +68,16 @@
   </div>
 </section>
 
-<section class="card">
-  <div class="card-hd">
-    <h2>{% if edit_memory %}编辑记忆{% else %}新增记忆{% endif %}</h2>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>{% if edit_memory %}编辑记忆{% else %}新增记忆{% endif %}</h3>
+      <p class="helper">适合修正群聊里已经提炼出的事实，或手动补充重要偏好、关系、提醒习惯等信息。</p>
+    </div>
     <span class="badge">结构化事实</span>
   </div>
-  <div class="card-bd">
-    <form method="post" action="{{ form_action|default(url_for('admin_memory')) }}" class="stack">
+  <div class="panel-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_memory')) }}" class="panel-stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field third">
@@ -89,13 +101,13 @@
           <textarea id="content" name="content" required>{{ edit_memory.content|default('') }}</textarea>
         </div>
       </div>
-      <label class="pill" style="width: fit-content;">
-        <input type="checkbox" name="enabled" value="1" {% if edit_memory.enabled is not defined or edit_memory.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+      <label class="checkbox-row">
+        <input type="checkbox" name="enabled" value="1" {% if edit_memory.enabled is not defined or edit_memory.enabled %}checked{% endif %}>
         启用此记忆
       </label>
       <div class="actions">
-        <button class="btn primary" type="submit">保存</button>
-        <a class="btn ghost" href="{{ url_for('admin_memory') }}">清空编辑</a>
+        <button class="btn btn-primary" type="submit">保存记忆</button>
+        <a class="btn btn-ghost" href="{{ url_for('admin_memory') }}">清空编辑</a>
       </div>
     </form>
   </div>

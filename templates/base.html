@@ -1,237 +1,62 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Feishu Bot 管理后台{% endblock %}</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f4f1ea;
-      --panel: #ffffff;
-      --panel-soft: #faf7f2;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --line: #e5ded2;
-      --primary: #2563eb;
-      --primary-strong: #1d4ed8;
-      --success: #15803d;
-      --danger: #b42318;
-      --warning: #b45309;
-      --shadow: 0 14px 40px rgba(31, 41, 55, 0.08);
-      --radius: 18px;
-      --max-width: 1240px;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(37, 99, 235, 0.10), transparent 28%),
-        radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 22%),
-        linear-gradient(180deg, #f8f5ef 0%, #f4f1ea 100%);
-      color: var(--text);
-    }
-    a { color: var(--primary); text-decoration: none; }
-    a:hover { color: var(--primary-strong); }
-    .shell { max-width: var(--max-width); margin: 0 auto; padding: 24px 16px 40px; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
-    .brand { display: flex; flex-direction: column; gap: 4px; }
-    .brand strong { font-size: 20px; letter-spacing: 0.02em; }
-    .brand span { color: var(--muted); font-size: 13px; }
-    .nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
-    .nav a, .nav button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      min-height: 40px;
-      padding: 10px 14px;
-      border: 1px solid transparent;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.72);
-      color: var(--text);
-      box-shadow: 0 2px 8px rgba(31, 41, 55, 0.04);
-      font: inherit;
-      cursor: pointer;
-    }
-    .nav a.active { background: var(--primary); color: #fff; }
-    .nav form { margin: 0; }
-    .page { display: grid; gap: 18px; }
-    .hero {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      padding: 22px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: rgba(255, 255, 255, 0.84);
-      box-shadow: var(--shadow);
-    }
-    .hero h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.2; }
-    .hero p { margin: 0; color: var(--muted); line-height: 1.7; }
-    .hero .meta { min-width: 200px; display: grid; gap: 8px; align-content: start; text-align: right; color: var(--muted); font-size: 13px; }
-    .grid { display: grid; gap: 18px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
-    .card {
-      grid-column: span 12;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .card .card-hd {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, #fff, #fcfbf8);
-    }
-    .card .card-hd h2, .card .card-hd h3 { margin: 0; font-size: 18px; }
-    .card .card-bd { padding: 18px; }
-    .toolbar, .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .badge, .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: var(--panel-soft);
-      color: var(--muted);
-      font-size: 12px;
-      border: 1px solid var(--line);
-    }
-    .flash-list { display: grid; gap: 10px; }
-    .flash {
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      box-shadow: 0 8px 20px rgba(31, 41, 55, 0.06);
-    }
-    .flash.success { border-left: 4px solid var(--success); }
-    .flash.error { border-left: 4px solid var(--danger); }
-    .flash.warning { border-left: 4px solid var(--warning); }
-    .flash.info { border-left: 4px solid var(--primary); }
-    table { width: 100%; border-collapse: collapse; }
-    th, td {
-      padding: 12px 10px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-      text-align: left;
-    }
-    th { color: var(--muted); font-size: 13px; font-weight: 600; background: #faf8f4; }
-    tr:hover td { background: #fcfbf8; }
-    .table-wrap { overflow-x: auto; }
-    .form-grid { display: grid; gap: 14px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
-    .field { grid-column: span 12; display: grid; gap: 6px; }
-    .field.half { grid-column: span 6; }
-    .field.third { grid-column: span 4; }
-    label { font-size: 13px; color: var(--muted); font-weight: 600; }
-    input, select, textarea {
-      width: 100%;
-      padding: 11px 12px;
-      border: 1px solid #d9d2c6;
-      border-radius: 12px;
-      background: white;
-      color: var(--text);
-      font: inherit;
-      outline: none;
-    }
-    textarea { min-height: 120px; resize: vertical; }
-    input:focus, select:focus, textarea:focus {
-      border-color: rgba(37, 99, 235, 0.6);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 1px solid transparent;
-      cursor: pointer;
-      font: inherit;
-      font-weight: 600;
-      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-    }
-    .btn:hover { transform: translateY(-1px); }
-    .btn.primary { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.16); }
-    .btn.ghost { background: white; color: var(--text); border-color: var(--line); }
-    .btn.danger { background: #fee4e2; color: var(--danger); border-color: #fecdca; }
-    .btn.success { background: #dcfce7; color: var(--success); border-color: #bbf7d0; }
-    .helper { color: var(--muted); font-size: 13px; line-height: 1.6; }
-    .stack { display: grid; gap: 12px; }
-    .empty {
-      padding: 28px 18px;
-      text-align: center;
-      color: var(--muted);
-      border: 1px dashed #d9d2c6;
-      border-radius: 16px;
-      background: rgba(255,255,255,.6);
-    }
-    .col-8 { grid-column: span 8; }
-    .col-6 { grid-column: span 6; }
-    .col-4 { grid-column: span 4; }
-    footer { margin-top: 22px; color: var(--muted); font-size: 12px; text-align: center; }
-    @media (max-width: 960px) {
-      .hero, .topbar { flex-direction: column; align-items: stretch; }
-      .hero .meta { min-width: 0; text-align: left; }
-      .field.half, .field.third, .col-8, .col-6, .col-4 { grid-column: span 12; }
-    }
-    @media (max-width: 640px) {
-      .shell { padding: 14px 10px 28px; }
-      .hero { padding: 18px; }
-      .card .card-bd { padding: 14px; }
-      .nav a, .nav button, .actions .btn { width: 100%; }
-      th, td { padding: 10px 8px; }
-    }
-  </style>
+  <title>{% block title %}飞书 Bot 管理后台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 </head>
-<body>
-  {% set current = current_page|default('') %}
-  <div class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <strong>{{ brand_name|default('Feishu Bot 管理后台') }}</strong>
-        <span>{{ brand_subtitle|default('轻量、清晰，适合小团队和家庭群使用') }}</span>
-      </div>
-      <nav class="nav" aria-label="后台导航">
-        {% if session.get('admin_logged_in') %}
-        <a href="{{ url_for('admin_groups') }}" class="{% if current == 'groups' %}active{% endif %}">分组</a>
-        <a href="{{ url_for('admin_triggers') }}" class="{% if current == 'triggers' %}active{% endif %}">触发</a>
-        <a href="{{ url_for('admin_memory') }}" class="{% if current == 'memory' %}active{% endif %}">记忆</a>
-        <a href="{{ url_for('admin_schedules') }}" class="{% if current == 'schedules' %}active{% endif %}">定时</a>
-        <a href="{{ url_for('admin_queue') }}" class="{% if current == 'queue' %}active{% endif %}">队列</a>
-        <form method="post" action="{{ url_for('admin_logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit">退出</button>
-        </form>
-        {% else %}
-        <a href="{{ url_for('admin_login') }}" class="{% if current == 'login' %}active{% endif %}">登录</a>
-        {% endif %}
-      </nav>
-    </header>
-
-    {% block shell %}
-    <main class="page">
-      {% block hero %}
-      <section class="hero">
+<body class="admin-body page-{{ current_page|default('dashboard') }}">
+  {% block shell %}
+  <div class="dashboard-shell">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand-mark">FB</div>
         <div>
-          <h1>{% block page_title %}后台管理{% endblock %}</h1>
-          <p>{% block page_desc %}在这里管理模型分组、触发规则、长期记忆、定时任务和排队状态。{% endblock %}</p>
+          <p class="eyebrow">Feishu Bot Console</p>
+          <h1 class="brand-title">{{ brand_name|default('飞书 Bot 管理后台') }}</h1>
+          <p class="brand-subtitle">{{ brand_subtitle|default('轻量服务端渲染，适合 512MB 小机部署') }}</p>
         </div>
-        <div class="meta">
-          <div class="pill">实例：{{ instance_name|default('本地 / Render') }}</div>
-          <div class="pill">用户：{{ current_user|default('未登录') }}</div>
+      </div>
+
+      <div class="sidebar-meta">
+        <div class="meta-card">
+          <span>实例</span>
+          <strong>{{ instance_name|default('Render / 单实例') }}</strong>
         </div>
-      </section>
-      {% endblock %}
+        <div class="meta-card">
+          <span>用户</span>
+          <strong>{{ current_user|default('管理员') }}</strong>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="后台导航">
+        <a href="{{ url_for('admin_groups') }}" class="{% if current_page == 'groups' %}active{% endif %}">AI 分组</a>
+        <a href="{{ url_for('admin_triggers') }}" class="{% if current_page == 'triggers' %}active{% endif %}">触发规则</a>
+        <a href="{{ url_for('admin_memory') }}" class="{% if current_page == 'memory' %}active{% endif %}">长期记忆</a>
+        <a href="{{ url_for('admin_schedules') }}" class="{% if current_page == 'schedules' %}active{% endif %}">定时消息</a>
+        <a href="{{ url_for('admin_queue') }}" class="{% if current_page == 'queue' %}active{% endif %}">消息队列</a>
+      </nav>
+
+      <form class="sidebar-logout" method="post" action="{{ url_for('admin_logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-ghost btn-block" type="submit">退出登录</button>
+      </form>
+    </aside>
+
+    <main class="content-shell">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow" style="color: var(--ink-soft);">轻量控制台</p>
+          <h2>{% block page_title %}后台管理{% endblock %}</h2>
+          <p class="page-desc">{% block page_desc %}在这里管理模型、触发规则、长期记忆、定时任务和消息队列状态。{% endblock %}</p>
+        </div>
+        <div class="page-head-meta">
+          <span class="badge">Flask SSR</span>
+          <span class="badge">单实例部署</span>
+          <span class="badge">Render Free 友好</span>
+        </div>
+      </header>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -244,10 +69,10 @@
       {% endwith %}
 
       {% block content %}{% endblock %}
-    </main>
-    {% endblock %}
 
-    <footer>{{ footer_text|default('后台为轻量服务端渲染，不依赖前端框架。') }}</footer>
+      <footer class="page-footer">{{ footer_text|default('后台只做轻量配置管理，不依赖前端框架。') }}</footer>
+    </main>
   </div>
+  {% endblock %}
 </body>
 </html>

@@ -2,17 +2,20 @@
 {% set current_page = "triggers" %}
 {% block title %}触发规则 - 管理后台{% endblock %}
 {% block page_title %}触发规则管理{% endblock %}
-{% block page_desc %}为关键词命中或全触发配置固定回复。{% endblock %}
+{% block page_desc %}为关键词命中和全触发兜底配置固定回复。保持规则少而精，会比堆很多弱规则更容易维护。{% endblock %}
 {% block content %}
-<section class="card">
-  <div class="card-hd">
-    <h2>规则列表</h2>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>规则列表</h3>
+      <p class="helper">同一消息最多执行一条规则。关键词规则优先，全触发规则适合作为最后的兜底。</p>
+    </div>
     <div class="toolbar">
       <span class="badge">关键词优先</span>
-      <span class="badge">同一消息只执行一条</span>
+      <span class="badge">全触发兜底</span>
     </div>
   </div>
-  <div class="card-bd">
+  <div class="panel-bd">
     <div class="table-wrap">
       <table>
         <thead>
@@ -34,17 +37,23 @@
             <td><span class="pill">{{ item.match_mode }}</span></td>
             <td class="helper">{{ item.keyword|default('') or '全触发' }}</td>
             <td>{{ item.reply_text }}</td>
-            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+            <td>
+              {% if item.enabled %}
+              <span class="pill">启用</span>
+              {% else %}
+              <span class="pill">停用</span>
+              {% endif %}
+            </td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_triggers', edit=item.id) }}">编辑</a>
-                <form method="post" action="{{ url_for('admin_trigger_preview', trigger_id=item.id) }}">
+                <a class="btn btn-ghost" href="{{ url_for('admin_triggers', edit=item.id) }}">编辑</a>
+                <form class="inline-form" method="post" action="{{ url_for('admin_trigger_preview', trigger_id=item.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn success" type="submit">预览</button>
+                  <button class="btn btn-success" type="submit">预览</button>
                 </form>
-                <form method="post" action="{{ url_for('admin_trigger_delete', trigger_id=item.id) }}" onsubmit="return confirm('确认删除这条触发规则吗？');">
+                <form class="inline-form" method="post" action="{{ url_for('admin_trigger_delete', trigger_id=item.id) }}" onsubmit="return confirm('确认删除这条触发规则吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn danger" type="submit">删除</button>
+                  <button class="btn btn-danger" type="submit">删除</button>
                 </form>
               </div>
             </td>
@@ -60,18 +69,21 @@
   </div>
 </section>
 
-<section class="card">
-  <div class="card-hd">
-    <h2>{% if edit_trigger %}编辑规则{% else %}新增规则{% endif %}</h2>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>{% if edit_trigger %}编辑规则{% else %}新增规则{% endif %}</h3>
+      <p class="helper">固定回复适合做明确指令、常见问答和兜底提示，不建议把它当复杂流程引擎来用。</p>
+    </div>
     <span class="badge">固定回复</span>
   </div>
-  <div class="card-bd">
-    <form method="post" action="{{ form_action|default(url_for('admin_triggers')) }}" class="stack">
+  <div class="panel-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_triggers')) }}" class="panel-stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field half">
           <label for="name">规则名称</label>
-          <input id="name" name="name" value="{{ edit_trigger.name|default('') }}" required>
+          <input id="name" name="name" value="{{ edit_trigger.name|default('') }}" placeholder="例如：测试模式提示" required>
         </div>
         <div class="field half">
           <label for="sort_order">排序</label>
@@ -91,20 +103,20 @@
         </div>
         <div class="field third">
           <label>匹配说明</label>
-          <div class="helper">`keyword` 表示命中关键词，`all` 表示在未命中关键词时作为兜底回复。</div>
+          <div class="helper"><code>keyword</code> 表示命中关键词，<code>all</code> 表示在未命中关键词时作为兜底回复。</div>
         </div>
         <div class="field">
           <label for="reply_text">回复内容</label>
           <textarea id="reply_text" name="reply_text" required>{{ edit_trigger.reply_text|default('') }}</textarea>
         </div>
       </div>
-      <label class="pill" style="width: fit-content;">
-        <input type="checkbox" name="enabled" value="1" {% if edit_trigger.enabled is not defined or edit_trigger.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+      <label class="checkbox-row">
+        <input type="checkbox" name="enabled" value="1" {% if edit_trigger.enabled is not defined or edit_trigger.enabled %}checked{% endif %}>
         启用此规则
       </label>
       <div class="actions">
-        <button class="btn primary" type="submit">保存</button>
-        <a class="btn ghost" href="{{ url_for('admin_triggers') }}">清空编辑</a>
+        <button class="btn btn-primary" type="submit">保存规则</button>
+        <a class="btn btn-ghost" href="{{ url_for('admin_triggers') }}">清空编辑</a>
       </div>
     </form>
   </div>

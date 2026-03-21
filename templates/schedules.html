@@ -1,15 +1,21 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% set current_page = "schedules" %}
 {% block title %}定时消息 - 管理后台{% endblock %}
 {% block page_title %}定时消息管理{% endblock %}
-{% block page_desc %}配置一次性、每天或每周发送的任务。{% endblock %}
+{% block page_desc %}配置一次性、每天或每周发送的任务。免费实例下这是 best-effort 能力，适合提醒和轻量通知。{% endblock %}
 {% block content %}
-<section class="card">
-  <div class="card-hd">
-    <h2>任务列表</h2>
-    <span class="badge">进程内 scheduler</span>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>任务列表</h3>
+      <p class="helper">试发用于快速确认 chat_id 和文案没有问题；真实定时触发仍取决于服务存活状态。</p>
+    </div>
+    <div class="toolbar">
+      <span class="badge">一次性 / 每天 / 每周</span>
+      <span class="badge">best-effort</span>
+    </div>
   </div>
-  <div class="card-bd">
+  <div class="panel-bd">
     <div class="table-wrap">
       <table>
         <thead>
@@ -30,18 +36,24 @@
             <td>{{ item.target_name|default(item.target_id) }}</td>
             <td><span class="pill">{{ item.schedule_type }}</span> {{ item.schedule_expr }}</td>
             <td>{{ item.message }}</td>
-            <td>{% if item.enabled %}<span class="pill">启用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
-            <td class="helper">{{ item.next_run_at|default('') }}</td>
+            <td>
+              {% if item.enabled %}
+              <span class="pill">启用</span>
+              {% else %}
+              <span class="pill">停用</span>
+              {% endif %}
+            </td>
+            <td class="helper">{{ item.next_run_at|default('未安排') or '未安排' }}</td>
             <td>
               <div class="actions">
-                <a class="btn ghost" href="{{ url_for('admin_schedules', edit=item.id) }}">编辑</a>
-                <form method="post" action="{{ url_for('admin_schedule_run_once', schedule_id=item.id) }}">
+                <a class="btn btn-ghost" href="{{ url_for('admin_schedules', edit=item.id) }}">编辑</a>
+                <form class="inline-form" method="post" action="{{ url_for('admin_schedule_run_once', schedule_id=item.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn success" type="submit">试发</button>
+                  <button class="btn btn-success" type="submit">试发</button>
                 </form>
-                <form method="post" action="{{ url_for('admin_schedule_delete', schedule_id=item.id) }}" onsubmit="return confirm('确认删除这个定时任务吗？');">
+                <form class="inline-form" method="post" action="{{ url_for('admin_schedule_delete', schedule_id=item.id) }}" onsubmit="return confirm('确认删除这个定时任务吗？');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <button class="btn danger" type="submit">删除</button>
+                  <button class="btn btn-danger" type="submit">删除</button>
                 </form>
               </div>
               {% if item.last_error %}
@@ -51,9 +63,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="7">
-              <div class="empty">暂无定时任务，可以先创建一个一次性提醒试试。</div>
-            </td>
+            <td colspan="7"><div class="empty">暂无定时任务，可以先创建一个一次性提醒做试发验证。</div></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -62,22 +72,25 @@
   </div>
 </section>
 
-<section class="card">
-  <div class="card-hd">
-    <h2>{% if edit_schedule %}编辑任务{% else %}新增任务{% endif %}</h2>
-    <span class="badge">一次性 / 每天 / 每周</span>
+<section class="panel">
+  <div class="panel-hd">
+    <div>
+      <h3>{% if edit_schedule %}编辑任务{% else %}新增任务{% endif %}</h3>
+      <p class="helper">建议先用“试发”确认目标 chat_id 没问题，再依赖真正的定时调度。</p>
+    </div>
+    <span class="badge">轻量提醒</span>
   </div>
-  <div class="card-bd">
-    <form method="post" action="{{ form_action|default(url_for('admin_schedules')) }}" class="stack">
+  <div class="panel-bd">
+    <form method="post" action="{{ form_action|default(url_for('admin_schedules')) }}" class="panel-stack">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field half">
           <label for="name">任务名称</label>
-          <input id="name" name="name" value="{{ edit_schedule.name|default('') }}" required>
+          <input id="name" name="name" value="{{ edit_schedule.name|default('') }}" placeholder="例如：晚饭提醒" required>
         </div>
         <div class="field half">
           <label for="target_id">目标</label>
-          <input id="target_id" name="target_id" value="{{ edit_schedule.target_id|default('') }}" required>
+          <input id="target_id" name="target_id" value="{{ edit_schedule.target_id|default('') }}" placeholder="飞书 chat_id" required>
         </div>
         <div class="field third">
           <label for="schedule_type">类型</label>
@@ -89,7 +102,7 @@
         </div>
         <div class="field third">
           <label for="schedule_expr">执行表达式</label>
-          <input id="schedule_expr" name="schedule_expr" value="{{ edit_schedule.schedule_expr|default('') }}" placeholder="如 2026-03-20 21:00、09:30、1 09:30">
+          <input id="schedule_expr" name="schedule_expr" value="{{ edit_schedule.schedule_expr|default('') }}" placeholder="2026-03-20 21:00 / 09:30 / 1 09:30">
         </div>
         <div class="field third">
           <label for="timezone">时区</label>
@@ -100,14 +113,14 @@
           <textarea id="message" name="message" required>{{ edit_schedule.message|default('') }}</textarea>
         </div>
       </div>
-      <div class="helper">一次性：`2026-03-20 21:00` 或 `2026-03-20T21:00`；每天：`09:30`；每周：`1 09:30`，其中 `0` 表示周一，`6` 表示周日。</div>
-      <label class="pill" style="width: fit-content;">
-        <input type="checkbox" name="enabled" value="1" {% if edit_schedule.enabled is not defined or edit_schedule.enabled %}checked{% endif %} style="width:auto; margin:0 6px 0 0;">
+      <div class="helper">一次性：<code>2026-03-20 21:00</code> 或 <code>2026-03-20T21:00</code>；每天：<code>09:30</code>；每周：<code>1 09:30</code>，其中 <code>0</code> 表示周一，<code>6</code> 表示周日。</div>
+      <label class="checkbox-row">
+        <input type="checkbox" name="enabled" value="1" {% if edit_schedule.enabled is not defined or edit_schedule.enabled %}checked{% endif %}>
         启用此任务
       </label>
       <div class="actions">
-        <button class="btn primary" type="submit">保存</button>
-        <a class="btn ghost" href="{{ url_for('admin_schedules') }}">清空编辑</a>
+        <button class="btn btn-primary" type="submit">保存任务</button>
+        <a class="btn btn-ghost" href="{{ url_for('admin_schedules') }}">清空编辑</a>
       </div>
     </form>
   </div>
